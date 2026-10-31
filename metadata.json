@@ -1,0 +1,6 @@
+{
+  "name": "Eradeh",
+  "description": "Advanced daily routine and strict habit tracker with Gemini AI bed inspection and morning voice challenge",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

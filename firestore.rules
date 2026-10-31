@@ -1,0 +1,93 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    function isValidTimestamp(ts) {
+      return ts is timestamp && ts <= request.time;
+    }
+
+    function isValidUserProfile(data, userId) {
+      return data.userId == userId &&
+        data.email is string && data.email.size() > 0 &&
+        data.trialStartDate is timestamp &&
+        data.trialEndDate is timestamp &&
+        data.streakCount is int && data.streakCount >= 0 &&
+        isValidTimestamp(data.createdAt) &&
+        isValidTimestamp(data.updatedAt) &&
+        (!('phoneNumber' in data) || data.phoneNumber is string) &&
+        (!('displayName' in data) || data.displayName is string) &&
+        (!('lastActiveDate' in data) || data.lastActiveDate is string);
+    }
+
+    function isValidRoutineTask(data, userId) {
+      return data.userId == userId &&
+        data.title is string && data.title.size() > 0 && data.title.size() <= 100 &&
+        data.type in ['bed_inspection', 'wake_voice', 'standard'] &&
+        data.targetTime is string &&
+        data.isCompletedToday is bool &&
+        data.strictLockEnabled is bool &&
+        isValidTimestamp(data.createdAt) &&
+        isValidTimestamp(data.updatedAt) &&
+        (!('id' in data) || data.id is string) &&
+        (!('lastCompletedAt' in data) || data.lastCompletedAt is timestamp);
+    }
+
+    function isValidVerificationLog(data, userId) {
+      return data.userId == userId &&
+        data.routineId is string && data.routineId.size() > 0 &&
+        data.type in ['bed', 'voice'] &&
+        data.isApproved is bool &&
+        data.aiFeedback is string &&
+        data.score is int && data.score >= 0 && data.score <= 100 &&
+        isValidTimestamp(data.createdAt) &&
+        (!('id' in data) || data.id is string);
+    }
+
+    function isValidUserNote(data, userId) {
+      return data.userId == userId &&
+        data.title is string && data.title.size() > 0 && data.title.size() <= 100 &&
+        data.content is string && data.content.size() <= 5000 &&
+        data.category is string &&
+        data.priority in ['high', 'medium', 'low'] &&
+        isValidTimestamp(data.createdAt) &&
+        isValidTimestamp(data.updatedAt) &&
+        (!('id' in data) || data.id is string);
+    }
+
+    match /users/{userId} {
+      allow read: if isOwner(userId);
+      allow create: if isOwner(userId) && isValidUserProfile(request.resource.data, userId);
+      allow update: if isOwner(userId) && isValidUserProfile(request.resource.data, userId);
+      allow delete: if isOwner(userId);
+
+      match /routines/{routineId} {
+        allow read: if isOwner(userId);
+        allow create: if isOwner(userId) && isValidRoutineTask(request.resource.data, userId);
+        allow update: if isOwner(userId) && isValidRoutineTask(request.resource.data, userId);
+        allow delete: if isOwner(userId);
+      }
+
+      match /verifications/{verificationId} {
+        allow read: if isOwner(userId);
+        allow create: if isOwner(userId) && isValidVerificationLog(request.resource.data, userId);
+        allow update: if isOwner(userId) && isValidVerificationLog(request.resource.data, userId);
+        allow delete: if isOwner(userId);
+      }
+
+      match /notes/{noteId} {
+        allow read: if isOwner(userId);
+        allow create: if isOwner(userId) && isValidUserNote(request.resource.data, userId);
+        allow update: if isOwner(userId) && isValidUserNote(request.resource.data, userId);
+        allow delete: if isOwner(userId);
+      }
+    }
+  }
+}

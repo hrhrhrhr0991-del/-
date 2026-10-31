@@ -1,0 +1,90 @@
+{
+  "entities": {
+    "UserProfile": {
+      "title": "UserProfile",
+      "description": "User profile with 14-day trial, contact details, and streak tracking",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "email": { "type": "string" },
+        "phoneNumber": { "type": "string" },
+        "displayName": { "type": "string" },
+        "trialStartDate": { "type": "string", "format": "date-time" },
+        "trialEndDate": { "type": "string", "format": "date-time" },
+        "streakCount": { "type": "integer" },
+        "lastActiveDate": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "email", "trialStartDate", "trialEndDate", "streakCount", "createdAt", "updatedAt"]
+    },
+    "RoutineTask": {
+      "title": "RoutineTask",
+      "description": "Daily recurring routine task with optional strict AI lock challenge",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "userId": { "type": "string" },
+        "title": { "type": "string" },
+        "type": { "type": "string", "enum": ["bed_inspection", "wake_voice", "standard"] },
+        "targetTime": { "type": "string" },
+        "isCompletedToday": { "type": "boolean" },
+        "lastCompletedAt": { "type": "string", "format": "date-time" },
+        "strictLockEnabled": { "type": "boolean" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "title", "type", "targetTime", "isCompletedToday", "strictLockEnabled", "createdAt", "updatedAt"]
+    },
+    "VerificationLog": {
+      "title": "VerificationLog",
+      "description": "Audit record of AI bed inspections and morning voice challenges",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "userId": { "type": "string" },
+        "routineId": { "type": "string" },
+        "type": { "type": "string", "enum": ["bed", "voice"] },
+        "isApproved": { "type": "boolean" },
+        "aiFeedback": { "type": "string" },
+        "score": { "type": "integer" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "routineId", "type", "isApproved", "aiFeedback", "score", "createdAt"]
+    },
+    "UserNote": {
+      "title": "UserNote",
+      "description": "Personal thought, habit reflection, or productivity note",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "userId": { "type": "string" },
+        "title": { "type": "string" },
+        "content": { "type": "string" },
+        "category": { "type": "string" },
+        "priority": { "type": "string", "enum": ["high", "medium", "low"] },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "title", "content", "category", "priority", "createdAt", "updatedAt"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "UserProfile",
+      "description": "User profile with trial status and streaks"
+    },
+    "/users/{userId}/routines/{routineId}": {
+      "schema": "RoutineTask",
+      "description": "User specific routine tasks"
+    },
+    "/users/{userId}/verifications/{verificationId}": {
+      "schema": "VerificationLog",
+      "description": "AI analysis logs for bed and voice verification"
+    },
+    "/users/{userId}/notes/{noteId}": {
+      "schema": "UserNote",
+      "description": "User personal notes and reflections"
+    }
+  }
+}
