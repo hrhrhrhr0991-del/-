@@ -15,6 +15,10 @@ data class RoutineTask(
     val isCompletedToday: Boolean = false,
     val lastCompletedAt: Timestamp? = null,
     val strictLockEnabled: Boolean = false,
+    val description: String = "",
+    val category: String = "صبحگاهی",
+    val priority: String = "high",
+    val repeatDays: String = "هر روز",
     @ServerTimestamp val createdAt: Timestamp? = null,
     @ServerTimestamp val updatedAt: Timestamp? = null
 )

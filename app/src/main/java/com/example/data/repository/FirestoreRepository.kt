@@ -178,6 +178,25 @@ class FirestoreRepository(
         )
     }
 
+    suspend fun updateUserPersona(personaArchetype: String, aiCoachTone: String) {
+        val uid = requireUserId()
+        val userDoc = db.collection("users").document(uid)
+        try {
+            userDoc.update(
+                mapOf(
+                    "personaArchetype" to personaArchetype,
+                    "aiCoachTone" to aiCoachTone,
+                    "updatedAt" to FieldValue.serverTimestamp()
+                )
+            ).await()
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            handleFirestoreError(e, OperationType.UPDATE, userDoc.path)
+            throw e
+        }
+    }
+
     suspend fun addRoutine(task: RoutineTask) {
         val uid = requireUserId()
         val routinesCol = db.collection("users").document(uid).collection("routines")
@@ -188,6 +207,10 @@ class FirestoreRepository(
             "targetTime" to task.targetTime,
             "isCompletedToday" to false,
             "strictLockEnabled" to task.strictLockEnabled,
+            "description" to task.description,
+            "category" to task.category,
+            "priority" to task.priority,
+            "repeatDays" to task.repeatDays,
             "createdAt" to FieldValue.serverTimestamp(),
             "updatedAt" to FieldValue.serverTimestamp()
         )

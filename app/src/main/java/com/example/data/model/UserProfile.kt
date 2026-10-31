@@ -16,6 +16,8 @@ data class UserProfile(
     val trialEndDate: Timestamp? = null,
     val streakCount: Long = 0L,
     val lastActiveDate: String = "",
+    val personaArchetype: String = "",
+    val aiCoachTone: String = "",
     @ServerTimestamp val createdAt: Timestamp? = null,
     @ServerTimestamp val updatedAt: Timestamp? = null
 )

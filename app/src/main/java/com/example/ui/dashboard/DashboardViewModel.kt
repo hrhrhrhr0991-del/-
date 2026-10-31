@@ -54,7 +54,16 @@ class DashboardViewModel(
         }
     }
 
-    fun addNewRoutine(title: String, type: String, time: String, strict: Boolean) {
+    fun addNewRoutine(
+        title: String,
+        type: String,
+        time: String,
+        strict: Boolean,
+        description: String = "",
+        category: String = "صبحگاهی",
+        priority: String = "high",
+        repeatDays: String = "هر روز"
+    ) {
         viewModelScope.launch {
             try {
                 repository.addRoutine(
@@ -62,9 +71,23 @@ class DashboardViewModel(
                         title = title,
                         type = type,
                         targetTime = time,
-                        strictLockEnabled = strict
+                        strictLockEnabled = strict,
+                        description = description,
+                        category = category,
+                        priority = priority,
+                        repeatDays = repeatDays
                     )
                 )
+            } catch (e: Exception) {
+                // handled
+            }
+        }
+    }
+
+    fun updateUserPersona(archetype: String, tone: String) {
+        viewModelScope.launch {
+            try {
+                repository.updateUserPersona(archetype, tone)
             } catch (e: Exception) {
                 // handled
             }

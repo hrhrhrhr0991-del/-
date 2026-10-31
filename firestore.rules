@@ -24,19 +24,25 @@ service cloud.firestore {
         isValidTimestamp(data.updatedAt) &&
         (!('phoneNumber' in data) || data.phoneNumber is string) &&
         (!('displayName' in data) || data.displayName is string) &&
+        (!('personaArchetype' in data) || data.personaArchetype is string) &&
+        (!('aiCoachTone' in data) || data.aiCoachTone is string) &&
         (!('lastActiveDate' in data) || data.lastActiveDate is string);
     }
 
     function isValidRoutineTask(data, userId) {
       return data.userId == userId &&
         data.title is string && data.title.size() > 0 && data.title.size() <= 100 &&
-        data.type in ['bed_inspection', 'wake_voice', 'standard'] &&
+        data.type is string && data.type.size() > 0 && data.type.size() <= 40 &&
         data.targetTime is string &&
         data.isCompletedToday is bool &&
         data.strictLockEnabled is bool &&
         isValidTimestamp(data.createdAt) &&
         isValidTimestamp(data.updatedAt) &&
         (!('id' in data) || data.id is string) &&
+        (!('description' in data) || data.description is string) &&
+        (!('category' in data) || data.category is string) &&
+        (!('priority' in data) || data.priority is string) &&
+        (!('repeatDays' in data) || data.repeatDays is string) &&
         (!('lastCompletedAt' in data) || data.lastCompletedAt is timestamp);
     }
 

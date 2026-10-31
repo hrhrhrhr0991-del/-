@@ -451,6 +451,28 @@ fun ProfileScreen(
                     }
                 }
 
+                if (profile.personaArchetype.isNotBlank()) {
+                    Spacer(modifier = Modifier.height(14.dp))
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Text("تیپ اراده:", color = TextSecondary)
+                        Text(profile.personaArchetype, color = NeonCyan, fontWeight = FontWeight.Bold)
+                    }
+                }
+
+                if (profile.aiCoachTone.isNotBlank()) {
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Text("سبک مربیگری:", color = TextSecondary)
+                        Text(profile.aiCoachTone, color = NeonEmerald, fontWeight = FontWeight.Bold)
+                    }
+                }
+
                 Spacer(modifier = Modifier.height(14.dp))
 
                 Row(
