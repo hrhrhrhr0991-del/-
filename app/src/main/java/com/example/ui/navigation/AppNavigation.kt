@@ -87,6 +87,14 @@ import com.example.ui.theme.TextPrimary
 import com.example.ui.theme.TextSecondary
 import java.util.Date
 
+import androidx.compose.foundation.clickable
+import androidx.compose.material.icons.filled.AdminPanelSettings
+import androidx.compose.runtime.collectAsState
+import com.example.ui.admin.AdminPanelScreen
+import com.example.ui.admin.isUserAdmin
+import com.example.ui.auth.CompleteProfileDialog
+import com.example.ui.subscription.SubscriptionScreen
+
 enum class MainTab(val title: String, val icon: ImageVector) {
     DASHBOARD("داشبورد", Icons.Default.Home),
     CHALLENGES("چالش‌ها", Icons.Default.Assignment),
@@ -99,6 +107,7 @@ sealed interface ActiveScreen {
     data class TabView(val tab: MainTab) : ActiveScreen
     data class BedChallenge(val task: RoutineTask) : ActiveScreen
     data class VoiceChallenge(val task: RoutineTask) : ActiveScreen
+    data object AdminPanel : ActiveScreen
 }
 
 @Composable
@@ -110,13 +119,51 @@ fun AppNavigation(
     authViewModel: AuthViewModel
 ) {
     val context = LocalContext.current
+    val liveProfile by repository.observeUserProfile(currentUserId).collectAsState(initial = userProfile)
+    val currentProfile = liveProfile ?: userProfile
+    val isAdmin = isUserAdmin(currentProfile.email)
+
+    val isTrialExpired = remember(currentProfile, isAdmin) {
+        if (isAdmin) return@remember false
+        if (currentProfile.isSubscribed) return@remember false
+        val trialEnd = currentProfile.trialEndDate?.toDate()
+        trialEnd != null && trialEnd.before(Date())
+    }
+
+    if (isTrialExpired) {
+        SubscriptionScreen(
+            userProfile = currentProfile,
+            repository = repository,
+            onSignOut = { authViewModel.signOut(context) }
+        )
+        return
+    }
+
     var currentScreen by remember { mutableStateOf<ActiveScreen>(ActiveScreen.TabView(MainTab.DASHBOARD)) }
 
     val dashboardViewModel = remember(currentUserId) { DashboardViewModel(repository) }
     val notesViewModel = remember(currentUserId) { NotesViewModel(repository) }
 
     CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Rtl) {
+        // Mandatory Profile Completion Dialog if phone number is blank
+        if (currentProfile.phoneNumber.isBlank()) {
+            CompleteProfileDialog(
+                userProfile = currentProfile,
+                repository = repository,
+                onProfileCompleted = {
+                    authViewModel.checkCurrentUser()
+                }
+            )
+        }
+
         when (val screen = currentScreen) {
+            is ActiveScreen.AdminPanel -> {
+                BackHandler { currentScreen = ActiveScreen.TabView(MainTab.PROFILE) }
+                AdminPanelScreen(
+                    repository = repository,
+                    onNavigateBack = { currentScreen = ActiveScreen.TabView(MainTab.PROFILE) }
+                )
+            }
             is ActiveScreen.BedChallenge -> {
                 BackHandler { currentScreen = ActiveScreen.TabView(MainTab.DASHBOARD) }
                 BedInspectionScreen(
@@ -228,7 +275,7 @@ fun AppNavigation(
                             }
                             MainTab.FOCUS -> {
                                 FocusScreen(
-                                    userProfile = userProfile,
+                                    userProfile = currentProfile,
                                     repository = repository
                                 )
                             }
@@ -237,7 +284,9 @@ fun AppNavigation(
                             }
                             MainTab.PROFILE -> {
                                 ProfileScreen(
-                                    profile = userProfile,
+                                    profile = currentProfile,
+                                    isAdmin = isAdmin,
+                                    onOpenAdminPanel = { currentScreen = ActiveScreen.AdminPanel },
                                     onSignOut = { authViewModel.signOut(context) }
                                 )
                             }
@@ -370,6 +419,8 @@ fun ChallengesHubScreen(
 @Composable
 fun ProfileScreen(
     profile: UserProfile,
+    isAdmin: Boolean = false,
+    onOpenAdminPanel: () -> Unit = {},
     onSignOut: () -> Unit
 ) {
     val daysRemaining = remember(profile) {
@@ -395,6 +446,58 @@ fun ProfileScreen(
         )
 
         Spacer(modifier = Modifier.height(16.dp))
+
+        // ADMIN PANEL ACCESS CARD (Exclusive for hrhrhrhr0991@gmail.com)
+        if (isAdmin) {
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .border(1.5.dp, NeonAmber, RoundedCornerShape(18.dp))
+                    .clickable { onOpenAdminPanel() }
+                    .testTag("admin_panel_open_card"),
+                colors = CardDefaults.cardColors(containerColor = DarkSurface),
+                shape = RoundedCornerShape(18.dp)
+            ) {
+                Row(
+                    modifier = Modifier.padding(18.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(50.dp)
+                            .clip(CircleShape)
+                            .background(NeonAmber.copy(alpha = 0.2f))
+                            .border(1.dp, NeonAmber, CircleShape),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.AdminPanelSettings,
+                            contentDescription = null,
+                            tint = NeonAmber,
+                            modifier = Modifier.size(30.dp)
+                        )
+                    }
+                    Spacer(modifier = Modifier.width(14.dp))
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = "ورود به مرکز فرماندهی (پنل مدیریت) 🛡️",
+                            style = MaterialTheme.typography.titleMedium,
+                            color = NeonAmber,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Spacer(modifier = Modifier.height(2.dp))
+                        Text(
+                            text = "تایید و رد فیش‌های واریزی، تمدید اشتراک و آمار کل کاربران",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = TextSecondary,
+                            fontSize = 11.sp
+                        )
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(14.dp))
+        }
 
         // ANTI-SANCTION & OFFLINE ENGINE BADGE CARD
         Card(
@@ -458,7 +561,7 @@ fun ProfileScreen(
                             fontWeight = FontWeight.Bold
                         )
                         Text(
-                            text = profile.email.ifBlank { "ثبت‌نام شده با شماره تماس" },
+                            text = profile.email.ifBlank { "ثبت‌نام شده با حساب گوگل" },
                             style = MaterialTheme.typography.bodySmall,
                             color = TextMuted
                         )
@@ -467,13 +570,13 @@ fun ProfileScreen(
 
                 Spacer(modifier = Modifier.height(20.dp))
 
-                // 14-Day Trial Status
+                // 14-Day Trial or Active Subscription Status
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
                         .clip(RoundedCornerShape(12.dp))
-                        .background(NeonAmber.copy(alpha = 0.15f))
-                        .border(1.dp, NeonAmber.copy(alpha = 0.5f), RoundedCornerShape(12.dp))
+                        .background(if (profile.isSubscribed) NeonEmerald.copy(alpha = 0.15f) else NeonAmber.copy(alpha = 0.15f))
+                        .border(1.dp, if (profile.isSubscribed) NeonEmerald.copy(alpha = 0.5f) else NeonAmber.copy(alpha = 0.5f), RoundedCornerShape(12.dp))
                         .padding(14.dp)
                 ) {
                     Row(
@@ -482,21 +585,32 @@ fun ProfileScreen(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
-                            Icon(Icons.Default.HourglassTop, contentDescription = null, tint = NeonAmber)
+                            Icon(Icons.Default.HourglassTop, contentDescription = null, tint = if (profile.isSubscribed) NeonEmerald else NeonAmber)
                             Spacer(modifier = Modifier.width(8.dp))
                             Text(
-                                text = "دوره آزمایشی ۱۴ روزه رایگان",
+                                text = if (profile.isSubscribed) "اشتراک فعال (${profile.subscriptionPlan})" else "دوره آزمایشی ۱۴ روزه رایگان",
                                 style = MaterialTheme.typography.titleMedium,
-                                color = NeonAmber,
+                                color = if (profile.isSubscribed) NeonEmerald else NeonAmber,
                                 fontWeight = FontWeight.Bold
                             )
                         }
                         Text(
-                            text = "$daysRemaining روز باقی‌مانده",
+                            text = if (isAdmin) "ادمین کل 🛡️" else "$daysRemaining روز باقی‌مانده",
                             style = MaterialTheme.typography.bodyMedium,
                             color = TextPrimary,
                             fontWeight = FontWeight.Bold
                         )
+                    }
+                }
+
+                if (profile.phoneNumber.isNotBlank()) {
+                    Spacer(modifier = Modifier.height(14.dp))
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Text("شماره تماس ثبت‌شده:", color = TextSecondary)
+                        Text(profile.phoneNumber, color = NeonCyan, fontWeight = FontWeight.Bold)
                     }
                 }
 

@@ -2,6 +2,7 @@ package com.example.data.repository
 
 import android.content.Context
 import com.example.R
+import com.example.data.model.PaymentRequest
 import com.example.data.model.RoutineTask
 import com.example.data.model.UserNote
 import com.example.data.model.UserProfile
@@ -356,6 +357,182 @@ class FirestoreRepository(
             throw e
         } catch (e: Exception) {
             handleFirestoreError(e, OperationType.UPDATE, docRef.path)
+        }
+    }
+
+    suspend fun updateUserProfileDetails(displayName: String, phoneNumber: String) {
+        val uid = requireUserId()
+        val userDoc = db.collection("users").document(uid)
+        try {
+            userDoc.update(
+                mapOf(
+                    "displayName" to displayName,
+                    "phoneNumber" to phoneNumber,
+                    "updatedAt" to FieldValue.serverTimestamp()
+                )
+            ).await()
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            handleFirestoreError(e, OperationType.UPDATE, userDoc.path)
+            throw e
+        }
+    }
+
+    suspend fun submitPaymentRequest(request: PaymentRequest) {
+        val uid = requireUserId()
+        val requestsCol = db.collection("payment_requests")
+        val payload = mapOf(
+            "userId" to uid,
+            "userEmail" to request.userEmail,
+            "userDisplayName" to request.userDisplayName,
+            "userPhone" to request.userPhone,
+            "planId" to request.planId,
+            "planTitle" to request.planTitle,
+            "planDurationDays" to request.planDurationDays,
+            "amountToman" to request.amountToman,
+            "senderCardLast4" to request.senderCardLast4,
+            "senderCardHolder" to request.senderCardHolder,
+            "trackingCode" to request.trackingCode,
+            "receiptImageBase64" to request.receiptImageBase64,
+            "status" to "pending",
+            "adminNote" to "",
+            "createdAt" to FieldValue.serverTimestamp(),
+            "updatedAt" to FieldValue.serverTimestamp()
+        )
+        try {
+            requestsCol.add(payload).await()
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            handleFirestoreError(e, OperationType.CREATE, requestsCol.path)
+            throw e
+        }
+    }
+
+    fun observeUserPaymentRequests(userId: String): Flow<List<PaymentRequest>> = flow {
+        val path = "payment_requests"
+        emitAll(
+            db.collection("payment_requests")
+                .whereEqualTo("userId", userId)
+                .snapshots()
+                .map { snapshot -> snapshot.toObjects(PaymentRequest::class.java) }
+                .catch { error ->
+                    if (error is Exception) handleFirestoreError(error, OperationType.LIST, path)
+                    throw error
+                }
+        )
+    }
+
+    // ADMIN OPERATIONS
+    fun observeAllUsers(): Flow<List<UserProfile>> = flow {
+        val path = "users"
+        emitAll(
+            db.collection("users")
+                .snapshots()
+                .map { snapshot -> snapshot.toObjects(UserProfile::class.java) }
+                .catch { error ->
+                    if (error is Exception) handleFirestoreError(error, OperationType.LIST, path)
+                    throw error
+                }
+        )
+    }
+
+    fun observeAllPaymentRequests(): Flow<List<PaymentRequest>> = flow {
+        val path = "payment_requests"
+        emitAll(
+            db.collection("payment_requests")
+                .snapshots()
+                .map { snapshot -> snapshot.toObjects(PaymentRequest::class.java) }
+                .catch { error ->
+                    if (error is Exception) handleFirestoreError(error, OperationType.LIST, path)
+                    throw error
+                }
+        )
+    }
+
+    suspend fun approvePaymentRequest(
+        requestId: String,
+        targetUserId: String,
+        durationDays: Long,
+        planTitle: String
+    ) {
+        val reqDoc = db.collection("payment_requests").document(requestId)
+        val userDoc = db.collection("users").document(targetUserId)
+
+        try {
+            reqDoc.update(
+                mapOf(
+                    "status" to "approved",
+                    "updatedAt" to FieldValue.serverTimestamp()
+                )
+            ).await()
+
+            val userSnap = userDoc.get().await()
+            val currentEndDate = userSnap.getTimestamp("trialEndDate")?.toDate() ?: Date()
+            val baseTime = if (currentEndDate.after(Date())) currentEndDate else Date()
+            val cal = Calendar.getInstance().apply {
+                time = baseTime
+                add(Calendar.DAY_OF_YEAR, durationDays.toInt())
+            }
+            val newTrialEnd = Timestamp(cal.time)
+
+            userDoc.update(
+                mapOf(
+                    "trialEndDate" to newTrialEnd,
+                    "isSubscribed" to true,
+                    "subscriptionPlan" to planTitle,
+                    "updatedAt" to FieldValue.serverTimestamp()
+                )
+            ).await()
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            handleFirestoreError(e, OperationType.UPDATE, reqDoc.path)
+            throw e
+        }
+    }
+
+    suspend fun rejectPaymentRequest(requestId: String, note: String) {
+        val reqDoc = db.collection("payment_requests").document(requestId)
+        try {
+            reqDoc.update(
+                mapOf(
+                    "status" to "rejected",
+                    "adminNote" to note,
+                    "updatedAt" to FieldValue.serverTimestamp()
+                )
+            ).await()
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            handleFirestoreError(e, OperationType.UPDATE, reqDoc.path)
+            throw e
+        }
+    }
+
+    suspend fun adminExtendUserSubscription(targetUserId: String, extraDays: Long) {
+        val userDoc = db.collection("users").document(targetUserId)
+        try {
+            val userSnap = userDoc.get().await()
+            val currentEndDate = userSnap.getTimestamp("trialEndDate")?.toDate() ?: Date()
+            val baseTime = if (currentEndDate.after(Date())) currentEndDate else Date()
+            val cal = Calendar.getInstance().apply {
+                time = baseTime
+                add(Calendar.DAY_OF_YEAR, extraDays.toInt())
+            }
+            userDoc.update(
+                mapOf(
+                    "trialEndDate" to Timestamp(cal.time),
+                    "isSubscribed" to true,
+                    "updatedAt" to FieldValue.serverTimestamp()
+                )
+            ).await()
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            handleFirestoreError(e, OperationType.UPDATE, userDoc.path)
+            throw e
         }
     }
 }

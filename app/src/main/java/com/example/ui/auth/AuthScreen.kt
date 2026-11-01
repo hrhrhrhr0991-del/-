@@ -77,13 +77,6 @@ fun AuthScreen(
     uiState: AuthUiState
 ) {
     val context = LocalContext.current
-    var showAlternativePhoneRegister by remember { mutableStateOf(false) }
-
-    var fullName by remember { mutableStateOf("") }
-    var phoneNumber by remember { mutableStateOf("") }
-    var email by remember { mutableStateOf("") }
-    var password by remember { mutableStateOf("") }
-    var otpInput by remember { mutableStateOf("") }
 
     CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Rtl) {
         Box(
@@ -237,7 +230,7 @@ fun AuthScreen(
                             )
                             Spacer(modifier = Modifier.width(10.dp))
                             Text(
-                                text = "ورود مستقیم و آسان با حساب گوگل",
+                                text = "ورود مستقیم و سریع با حساب گوگل",
                                 style = MaterialTheme.typography.titleMedium,
                                 fontWeight = FontWeight.Bold
                             )
@@ -245,143 +238,29 @@ fun AuthScreen(
                     }
                 }
 
-                Spacer(modifier = Modifier.height(16.dp))
+                Spacer(modifier = Modifier.height(18.dp))
 
-                // Alternative registration toggle
-                Text(
-                    text = if (!showAlternativePhoneRegister) "یا ورود/ثبت‌نام با شماره تماس و ایمیل ▼" else "بستن فرم شماره تماس ▲",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = NeonAmber,
+                // Sole authentication guarantee note
+                Row(
                     modifier = Modifier
-                        .clickable { showAlternativePhoneRegister = !showAlternativePhoneRegister }
-                        .padding(8.dp)
-                )
-
-                // EXPANDABLE ALTERNATIVE FORM
-                AnimatedVisibility(visible = showAlternativePhoneRegister) {
-                    Column(modifier = Modifier.padding(top = 12.dp)) {
-                        if (uiState !is AuthUiState.OtpVerificationSent) {
-                            Card(
-                                modifier = Modifier.fillMaxWidth(),
-                                colors = CardDefaults.cardColors(containerColor = DarkSurface),
-                                shape = RoundedCornerShape(16.dp)
-                            ) {
-                                Column(modifier = Modifier.padding(18.dp)) {
-                                    OutlinedTextField(
-                                        value = fullName,
-                                        onValueChange = { fullName = it },
-                                        label = { Text("نام و نام خانوادگی") },
-                                        leadingIcon = { Icon(Icons.Default.Person, contentDescription = null, tint = NeonCyan) },
-                                        modifier = Modifier.fillMaxWidth().testTag("register_fullname_input"),
-                                        singleLine = true,
-                                        colors = OutlinedTextFieldDefaults.colors(
-                                            focusedBorderColor = NeonCyan,
-                                            unfocusedBorderColor = Color(0xFF26324A)
-                                        )
-                                    )
-                                    Spacer(modifier = Modifier.height(10.dp))
-                                    OutlinedTextField(
-                                        value = phoneNumber,
-                                        onValueChange = { phoneNumber = it },
-                                        label = { Text("شماره تماس") },
-                                        leadingIcon = { Icon(Icons.Default.Phone, contentDescription = null, tint = NeonCyan) },
-                                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
-                                        modifier = Modifier.fillMaxWidth().testTag("register_phone_input"),
-                                        singleLine = true,
-                                        colors = OutlinedTextFieldDefaults.colors(
-                                            focusedBorderColor = NeonCyan,
-                                            unfocusedBorderColor = Color(0xFF26324A)
-                                        )
-                                    )
-                                    Spacer(modifier = Modifier.height(10.dp))
-                                    OutlinedTextField(
-                                        value = email,
-                                        onValueChange = { email = it },
-                                        label = { Text("ایمیل") },
-                                        leadingIcon = { Icon(Icons.Default.Email, contentDescription = null, tint = NeonCyan) },
-                                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
-                                        modifier = Modifier.fillMaxWidth().testTag("register_email_input"),
-                                        singleLine = true,
-                                        colors = OutlinedTextFieldDefaults.colors(
-                                            focusedBorderColor = NeonCyan,
-                                            unfocusedBorderColor = Color(0xFF26324A)
-                                        )
-                                    )
-                                    Spacer(modifier = Modifier.height(10.dp))
-                                    OutlinedTextField(
-                                        value = password,
-                                        onValueChange = { password = it },
-                                        label = { Text("رمز عبور (حداقل ۶ کاراکتر)") },
-                                        leadingIcon = { Icon(Icons.Default.Lock, contentDescription = null, tint = NeonCyan) },
-                                        visualTransformation = PasswordVisualTransformation(),
-                                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
-                                        modifier = Modifier.fillMaxWidth().testTag("register_password_input"),
-                                        singleLine = true,
-                                        colors = OutlinedTextFieldDefaults.colors(
-                                            focusedBorderColor = NeonCyan,
-                                            unfocusedBorderColor = Color(0xFF26324A)
-                                        )
-                                    )
-                                    Spacer(modifier = Modifier.height(16.dp))
-                                    Button(
-                                        onClick = {
-                                            authViewModel.requestEmailPhoneRegister(fullName, phoneNumber, email, password)
-                                        },
-                                        modifier = Modifier.fillMaxWidth().height(48.dp),
-                                        colors = ButtonDefaults.buttonColors(containerColor = NeonAmber, contentColor = DarkBackground),
-                                        shape = RoundedCornerShape(12.dp)
-                                    ) {
-                                        Text("ارسال کد تایید فعال‌سازی", fontWeight = FontWeight.Bold)
-                                    }
-                                }
-                            }
-                        } else {
-                            val otpState = uiState as AuthUiState.OtpVerificationSent
-                            Card(
-                                modifier = Modifier.fillMaxWidth(),
-                                colors = CardDefaults.cardColors(containerColor = DarkSurface),
-                                shape = RoundedCornerShape(16.dp)
-                            ) {
-                                Column(
-                                    modifier = Modifier.padding(18.dp),
-                                    horizontalAlignment = Alignment.CenterHorizontally
-                                ) {
-                                    Text(
-                                        text = "کد تایید ۶ رقمی به ${otpState.email} ارسال شد (کد تست: ${otpState.code})",
-                                        style = MaterialTheme.typography.bodySmall,
-                                        color = TextSecondary,
-                                        textAlign = TextAlign.Center
-                                    )
-                                    Spacer(modifier = Modifier.height(12.dp))
-                                    OutlinedTextField(
-                                        value = otpInput,
-                                        onValueChange = { if (it.length <= 6) otpInput = it },
-                                        label = { Text("کد ۶ رقمی") },
-                                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                                        modifier = Modifier.fillMaxWidth(),
-                                        singleLine = true
-                                    )
-                                    Spacer(modifier = Modifier.height(14.dp))
-                                    Button(
-                                        onClick = {
-                                            authViewModel.verifyOtpAndComplete(
-                                                otpInput,
-                                                otpState.code,
-                                                otpState.email,
-                                                otpState.phone,
-                                                context
-                                            )
-                                        },
-                                        modifier = Modifier.fillMaxWidth().height(48.dp),
-                                        colors = ButtonDefaults.buttonColors(containerColor = NeonEmerald, contentColor = DarkBackground),
-                                        shape = RoundedCornerShape(12.dp)
-                                    ) {
-                                        Text("تایید نهایی و ورود", fontWeight = FontWeight.Bold)
-                                    }
-                                }
-                            }
-                        }
-                    }
+                        .clip(RoundedCornerShape(10.dp))
+                        .background(Color(0xFF141C2E))
+                        .padding(horizontal = 14.dp, vertical = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Security,
+                        contentDescription = null,
+                        tint = NeonCyan,
+                        modifier = Modifier.size(16.dp)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = "ورود ایمن، رمزنگاری‌شده و یک‌کلیکه با اکانت رسمی گوگل",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = TextSecondary,
+                        fontSize = 11.sp
+                    )
                 }
             }
         }

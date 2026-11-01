@@ -10,6 +10,11 @@ service cloud.firestore {
       return isAuthenticated() && request.auth.uid == userId;
     }
 
+    function isAdmin() {
+      return isAuthenticated() && 
+        (request.auth.token.email == 'hrhrhrhr0991@gmail.com' || request.auth.token.email == 'hrhrhrhr201111@gmail.com');
+    }
+
     function isValidTimestamp(ts) {
       return ts is timestamp && ts <= request.time;
     }
@@ -26,7 +31,10 @@ service cloud.firestore {
         (!('displayName' in data) || data.displayName is string) &&
         (!('personaArchetype' in data) || data.personaArchetype is string) &&
         (!('aiCoachTone' in data) || data.aiCoachTone is string) &&
-        (!('lastActiveDate' in data) || data.lastActiveDate is string);
+        (!('lastActiveDate' in data) || data.lastActiveDate is string) &&
+        (!('totalFocusMinutes' in data) || data.totalFocusMinutes is int) &&
+        (!('isSubscribed' in data) || data.isSubscribed is bool) &&
+        (!('subscriptionPlan' in data) || data.subscriptionPlan is string);
     }
 
     function isValidRoutineTask(data, userId) {
@@ -69,31 +77,40 @@ service cloud.firestore {
     }
 
     match /users/{userId} {
-      allow read: if isOwner(userId);
+      allow read: if isOwner(userId) || isAdmin();
+      allow list: if isAdmin();
       allow create: if isOwner(userId) && isValidUserProfile(request.resource.data, userId);
-      allow update: if isOwner(userId) && isValidUserProfile(request.resource.data, userId);
-      allow delete: if isOwner(userId);
+      allow update: if (isOwner(userId) || isAdmin());
+      allow delete: if isOwner(userId) || isAdmin();
 
       match /routines/{routineId} {
-        allow read: if isOwner(userId);
+        allow read: if isOwner(userId) || isAdmin();
         allow create: if isOwner(userId) && isValidRoutineTask(request.resource.data, userId);
         allow update: if isOwner(userId) && isValidRoutineTask(request.resource.data, userId);
-        allow delete: if isOwner(userId);
+        allow delete: if isOwner(userId) || isAdmin();
       }
 
       match /verifications/{verificationId} {
-        allow read: if isOwner(userId);
+        allow read: if isOwner(userId) || isAdmin();
         allow create: if isOwner(userId) && isValidVerificationLog(request.resource.data, userId);
         allow update: if isOwner(userId) && isValidVerificationLog(request.resource.data, userId);
-        allow delete: if isOwner(userId);
+        allow delete: if isOwner(userId) || isAdmin();
       }
 
       match /notes/{noteId} {
-        allow read: if isOwner(userId);
+        allow read: if isOwner(userId) || isAdmin();
         allow create: if isOwner(userId) && isValidUserNote(request.resource.data, userId);
         allow update: if isOwner(userId) && isValidUserNote(request.resource.data, userId);
-        allow delete: if isOwner(userId);
+        allow delete: if isOwner(userId) || isAdmin();
       }
+    }
+
+    match /payment_requests/{requestId} {
+      allow create: if isAuthenticated() && request.resource.data.userId == request.auth.uid;
+      allow read: if isAuthenticated() && (resource.data.userId == request.auth.uid || isAdmin());
+      allow list: if isAdmin();
+      allow update: if isAdmin();
+      allow delete: if isAdmin();
     }
   }
 }

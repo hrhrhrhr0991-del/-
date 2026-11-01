@@ -19,6 +19,8 @@ data class UserProfile(
     val personaArchetype: String = "",
     val aiCoachTone: String = "",
     val totalFocusMinutes: Long = 0L,
+    val isSubscribed: Boolean = false,
+    val subscriptionPlan: String = "",
     @ServerTimestamp val createdAt: Timestamp? = null,
     @ServerTimestamp val updatedAt: Timestamp? = null
 )
