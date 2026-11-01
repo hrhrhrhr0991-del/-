@@ -55,6 +55,12 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
+import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.SelfImprovement
+import androidx.compose.material.icons.filled.Translate
+import androidx.compose.material.icons.filled.WaterDrop
 import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
@@ -63,9 +69,11 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -91,6 +99,7 @@ import com.example.ui.theme.NeonEmerald
 import com.example.ui.theme.TextMuted
 import com.example.ui.theme.TextPrimary
 import com.example.ui.theme.TextSecondary
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import java.util.Date
 
@@ -110,12 +119,18 @@ fun DashboardScreen(
     val userProfile by viewModel.userProfile.collectAsState()
     val scope = rememberCoroutineScope()
 
+    var isEnglish by rememberSaveable { mutableStateOf(false) }
+    var showBreathingDialog by remember { mutableStateOf(false) }
+    val waterGlasses by viewModel.waterGlasses.collectAsState()
+
     var showAddDialog by remember { mutableStateOf(false) }
     var showPersonaDialog by remember { mutableStateOf(false) }
     var dailyBriefing by remember { mutableStateOf<String?>(null) }
     var isGeneratingBriefing by remember { mutableStateOf(false) }
 
-    CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Rtl) {
+    val layoutDirection = if (isEnglish) LayoutDirection.Ltr else LayoutDirection.Rtl
+
+    CompositionLocalProvider(LocalLayoutDirection provides layoutDirection) {
         Box(
             modifier = Modifier
                 .fillMaxSize()
@@ -129,7 +144,7 @@ fun DashboardScreen(
             ) {
                 item { Spacer(modifier = Modifier.height(28.dp)) }
 
-                // Header Profile & 14-day trial badge
+                // Header Profile & 14-day trial badge & Language Switcher
                 item {
                     val daysRemaining = remember(userProfile) {
                         val end = userProfile?.trialEndDate?.toDate()
@@ -145,45 +160,147 @@ fun DashboardScreen(
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Column {
+                        Column(modifier = Modifier.weight(1f)) {
                             Text(
-                                text = "فرماندهی اراده ⚡",
+                                text = if (isEnglish) "WILLPOWER COMMAND ⚡" else "فرماندهی اراده ⚡",
                                 style = MaterialTheme.typography.headlineLarge,
                                 color = NeonCyan,
                                 fontWeight = FontWeight.Bold
                             )
                             Text(
-                                text = userProfile?.displayName?.ifBlank { "کاربر سخت‌کوش" } ?: "کاربر سخت‌کوش",
+                                text = if (isEnglish) "Smart Discipline & AI Routines" else (userProfile?.displayName?.ifBlank { "کاربر سخت‌کوش" } ?: "کاربر سخت‌کوش"),
                                 style = MaterialTheme.typography.titleMedium,
                                 color = TextSecondary
                             )
                         }
 
-                        // Trial Badge
-                        Box(
-                            modifier = Modifier
-                                .clip(RoundedCornerShape(12.dp))
-                                .background(NeonAmber.copy(alpha = 0.15f))
-                                .border(1.dp, NeonAmber.copy(alpha = 0.6f), RoundedCornerShape(12.dp))
-                                .padding(horizontal = 12.dp, vertical = 6.dp)
-                        ) {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Icon(
-                                    imageVector = Icons.Default.HourglassTop,
-                                    contentDescription = null,
-                                    tint = NeonAmber,
-                                    modifier = Modifier.size(16.dp)
-                                )
-                                Spacer(modifier = Modifier.width(4.dp))
-                                Text(
-                                    text = "$daysRemaining روز آزمایشی",
-                                    style = MaterialTheme.typography.labelMedium,
-                                    color = NeonAmber,
-                                    fontWeight = FontWeight.Bold
-                                )
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            // Language Switcher
+                            Box(
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(12.dp))
+                                    .background(Color(0xFF1E283D))
+                                    .border(1.dp, NeonCyan.copy(alpha = 0.5f), RoundedCornerShape(12.dp))
+                                    .clickable { isEnglish = !isEnglish }
+                                    .padding(horizontal = 8.dp, vertical = 6.dp)
+                                    .testTag("language_toggle_btn")
+                            ) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Icon(
+                                        imageVector = Icons.Default.Translate,
+                                        contentDescription = null,
+                                        tint = NeonCyan,
+                                        modifier = Modifier.size(15.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    Text(
+                                        text = if (isEnglish) "🌐 EN" else "🇮🇷 FA",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = NeonCyan,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                }
+                            }
+
+                            Spacer(modifier = Modifier.width(6.dp))
+
+                            // Trial Badge
+                            Box(
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(12.dp))
+                                    .background(NeonAmber.copy(alpha = 0.15f))
+                                    .border(1.dp, NeonAmber.copy(alpha = 0.6f), RoundedCornerShape(12.dp))
+                                    .padding(horizontal = 10.dp, vertical = 6.dp)
+                            ) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Icon(
+                                        imageVector = Icons.Default.HourglassTop,
+                                        contentDescription = null,
+                                        tint = NeonAmber,
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    Text(
+                                        text = if (isEnglish) "$daysRemaining d Trial" else "$daysRemaining روز آزمایشی",
+                                        style = MaterialTheme.typography.labelMedium,
+                                        color = NeonAmber,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                }
                             }
                         }
                     }
+                }
+
+                // SMART MORNING BOX BREATHING PROTOCOL (4-4-4-4)
+                item {
+                    Card(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .border(1.dp, NeonCyan.copy(alpha = 0.4f), RoundedCornerShape(18.dp)),
+                        colors = CardDefaults.cardColors(containerColor = DarkSurface),
+                        shape = RoundedCornerShape(18.dp)
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(16.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(44.dp)
+                                        .clip(CircleShape)
+                                        .background(NeonCyan.copy(alpha = 0.15f))
+                                        .border(1.dp, NeonCyan, CircleShape),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.SelfImprovement,
+                                        contentDescription = null,
+                                        tint = NeonCyan,
+                                        modifier = Modifier.size(26.dp)
+                                    )
+                                }
+                                Spacer(modifier = Modifier.width(12.dp))
+                                Column {
+                                    Text(
+                                        text = if (isEnglish) "Box Breathing (4-4-4-4) 🧘‍♂️" else "تنفس جعبه‌ای ریتمیک ۴-۴-۴-۴ 🧘‍♂️",
+                                        style = MaterialTheme.typography.titleMedium,
+                                        color = NeonCyan,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                    Text(
+                                        text = if (isEnglish) "1-Minute mental clarity & focus protocol" else "جلسه ۱ دقیقه‌ای پاکسازی ذهن و کاهش کورتیزول",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = TextSecondary,
+                                        fontSize = 11.sp
+                                    )
+                                }
+                            }
+                            Button(
+                                onClick = { showBreathingDialog = true },
+                                colors = ButtonDefaults.buttonColors(containerColor = NeonCyan, contentColor = DarkBackground),
+                                shape = RoundedCornerShape(10.dp),
+                                modifier = Modifier.testTag("start_breathwork_btn")
+                            ) {
+                                Icon(Icons.Default.PlayArrow, contentDescription = null, modifier = Modifier.size(16.dp))
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text(if (isEnglish) "Start" else "شروع", fontWeight = FontWeight.Bold)
+                            }
+                        }
+                    }
+                }
+
+                // SMART HYDRATION TRACKER (8 GLASSES / 2000 ML)
+                item {
+                    SmartHydrationCard(
+                        glasses = waterGlasses,
+                        isEnglish = isEnglish,
+                        onGlassClick = { viewModel.setWaterGlasses(it) }
+                    )
                 }
 
                 if (!userProfile?.adminNote.isNullOrBlank()) {
@@ -407,7 +524,7 @@ fun DashboardScreen(
                     val totalCount = tasks.size.coerceAtLeast(1)
                     val todayPct = if (tasks.isEmpty()) 40 else ((completedCount.toFloat() / totalCount) * 100).toInt()
 
-                    WeeklyHabitAnalyticsCard(todayPct = todayPct)
+                    WeeklyHabitAnalyticsCard(todayPct = todayPct, isEnglish = isEnglish)
                 }
 
                 // DAILY AI BRIEFING & COACHING
@@ -546,17 +663,34 @@ fun DashboardScreen(
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Text(
-                            text = "روتین‌های روزمره و چالش‌ها",
-                            style = MaterialTheme.typography.titleLarge,
-                            color = TextPrimary,
-                            fontWeight = FontWeight.Bold
-                        )
-                        Text(
-                            text = "با قابلیت شخصی‌سازی کامل",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = TextMuted
-                        )
+                        Column {
+                            Text(
+                                text = if (isEnglish) "Daily Routines & Challenges" else "روتین‌های روزمره و چالش‌ها",
+                                style = MaterialTheme.typography.titleLarge,
+                                color = TextPrimary,
+                                fontWeight = FontWeight.Bold
+                            )
+                            Text(
+                                text = if (isEnglish) "World-class customizable protocols" else "با قابلیت شخصی‌سازی کامل",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = TextMuted
+                            )
+                        }
+
+                        OutlinedButton(
+                            onClick = { viewModel.seedGoldenInternationalRoutines() },
+                            shape = RoundedCornerShape(10.dp),
+                            colors = ButtonDefaults.outlinedButtonColors(contentColor = NeonAmber),
+                            modifier = Modifier.testTag("seed_golden_routines_btn")
+                        ) {
+                            Icon(Icons.Default.AutoAwesome, contentDescription = null, modifier = Modifier.size(16.dp))
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text(
+                                text = if (isEnglish) "+ Golden 6" else "+ روتین‌های طلایی",
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
                     }
                 }
 
@@ -586,17 +720,44 @@ fun DashboardScreen(
                     is RoutinesUiState.Success -> {
                         if (state.tasks.isEmpty()) {
                             item {
-                                Box(
+                                Card(
                                     modifier = Modifier
                                         .fillMaxWidth()
-                                        .padding(32.dp),
-                                    contentAlignment = Alignment.Center
+                                        .border(1.dp, NeonAmber.copy(alpha = 0.5f), RoundedCornerShape(18.dp)),
+                                    colors = CardDefaults.cardColors(containerColor = DarkSurface),
+                                    shape = RoundedCornerShape(18.dp)
                                 ) {
-                                    Text(
-                                        text = "هنوز تسکی اضافه نکرده‌اید. دکمه + را بزنید.",
-                                        color = TextMuted,
-                                        style = MaterialTheme.typography.bodyMedium
-                                    )
+                                    Column(
+                                        modifier = Modifier.fillMaxWidth().padding(24.dp),
+                                        horizontalAlignment = Alignment.CenterHorizontally
+                                    ) {
+                                        Icon(Icons.Default.AutoAwesome, contentDescription = null, tint = NeonAmber, modifier = Modifier.size(36.dp))
+                                        Spacer(modifier = Modifier.height(10.dp))
+                                        Text(
+                                            text = if (isEnglish) "No routines active yet" else "هنوز تسک یا روتینی اضافه نکرده‌اید",
+                                            color = TextPrimary,
+                                            style = MaterialTheme.typography.titleMedium,
+                                            fontWeight = FontWeight.Bold
+                                        )
+                                        Spacer(modifier = Modifier.height(4.dp))
+                                        Text(
+                                            text = if (isEnglish) "Tap below to activate 6 proven Golden International Routines (Dawn, AI Bed, Hydration, Pomodoro):" else "با یک لمس ۶ روتین هوشمند طلایی بین‌المللی (سحرخیزی، هوش مصنوعی تختخواب، آبرسانی، پومودورو) را فعال کنید:",
+                                            color = TextSecondary,
+                                            style = MaterialTheme.typography.bodySmall,
+                                            textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                                        )
+                                        Spacer(modifier = Modifier.height(16.dp))
+                                        Button(
+                                            onClick = { viewModel.seedGoldenInternationalRoutines() },
+                                            colors = ButtonDefaults.buttonColors(containerColor = NeonAmber, contentColor = DarkBackground),
+                                            shape = RoundedCornerShape(12.dp),
+                                            modifier = Modifier.testTag("empty_state_seed_btn")
+                                        ) {
+                                            Icon(Icons.Default.AutoAwesome, contentDescription = null)
+                                            Spacer(modifier = Modifier.width(8.dp))
+                                            Text(if (isEnglish) "Activate Golden Routines" else "فعال‌سازی ۶ روتین هوشمند طلایی", fontWeight = FontWeight.Bold)
+                                        }
+                                    }
                                 }
                             }
                         } else {
@@ -627,6 +788,14 @@ fun DashboardScreen(
             ) {
                 Icon(Icons.Default.Add, contentDescription = "افزودن تسک")
             }
+        }
+
+        // BOX BREATHING PROTOCOL DIALOG
+        if (showBreathingDialog) {
+            BoxBreathingDialog(
+                isEnglish = isEnglish,
+                onDismiss = { showBreathingDialog = false }
+            )
         }
 
         // CUSTOM TASK BUILDER DIALOG
@@ -664,8 +833,16 @@ fun DashboardScreen(
 }
 
 @Composable
-fun WeeklyHabitAnalyticsCard(todayPct: Int) {
-    val weekDays = listOf(
+fun WeeklyHabitAnalyticsCard(todayPct: Int, isEnglish: Boolean = false) {
+    val weekDays = if (isEnglish) listOf(
+        "Mon" to 100,
+        "Tue" to 85,
+        "Wed" to 70,
+        "Thu" to 90,
+        "Fri" to 100,
+        "Sat" to 80,
+        "Sun" to todayPct
+    ) else listOf(
         "ش" to 100,
         "۱ش" to 85,
         "۲ش" to 70,
@@ -692,14 +869,14 @@ fun WeeklyHabitAnalyticsCard(todayPct: Int) {
                     Icon(Icons.Default.BarChart, contentDescription = null, tint = NeonCyan)
                     Spacer(modifier = Modifier.width(8.dp))
                     Text(
-                        text = "نمودار هفتگی استمرار اراده",
+                        text = if (isEnglish) "Weekly Discipline Analytics" else "نمودار هفتگی استمرار اراده",
                         style = MaterialTheme.typography.titleMedium,
                         color = TextPrimary,
                         fontWeight = FontWeight.Bold
                     )
                 }
                 Text(
-                    text = "میانگین: ۸۶٪",
+                    text = if (isEnglish) "Avg: 86%" else "میانگین: ۸۶٪",
                     style = MaterialTheme.typography.labelSmall,
                     color = NeonEmerald,
                     fontWeight = FontWeight.Bold
@@ -716,7 +893,7 @@ fun WeeklyHabitAnalyticsCard(todayPct: Int) {
                 verticalAlignment = Alignment.Bottom
             ) {
                 weekDays.forEach { (dayName, pct) ->
-                    val isToday = dayName == "ج"
+                    val isToday = if (isEnglish) dayName == "Sun" else dayName == "ج"
                     Column(
                         horizontalAlignment = Alignment.CenterHorizontally,
                         modifier = Modifier.weight(1f)
@@ -750,6 +927,247 @@ fun WeeklyHabitAnalyticsCard(todayPct: Int) {
             }
         }
     }
+}
+
+@Composable
+fun SmartHydrationCard(
+    glasses: Int,
+    isEnglish: Boolean,
+    onGlassClick: (Int) -> Unit
+) {
+    val totalGoal = 8
+    val currentMl = glasses * 250
+    val totalMl = 2000
+    val pct = ((glasses.toFloat() / totalGoal) * 100).toInt()
+
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .border(1.dp, Color(0xFF00B0FF).copy(alpha = 0.5f), RoundedCornerShape(18.dp)),
+        colors = CardDefaults.cardColors(containerColor = DarkSurface),
+        shape = RoundedCornerShape(18.dp)
+    ) {
+        Column(modifier = Modifier.padding(18.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        imageVector = Icons.Default.WaterDrop,
+                        contentDescription = null,
+                        tint = Color(0xFF00B0FF),
+                        modifier = Modifier.size(24.dp)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = if (isEnglish) "Smart Daily Hydration" else "آبرسانی و هیدراتاسیون هوشمند",
+                        style = MaterialTheme.typography.titleMedium,
+                        color = TextPrimary,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+                Text(
+                    text = "$currentMl / $totalMl ${if (isEnglish) "ml" else "سی‌سی"} ($pct%)",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = Color(0xFF00B0FF),
+                    fontWeight = FontWeight.Bold
+                )
+            }
+
+            Spacer(modifier = Modifier.height(14.dp))
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                for (i in 1..8) {
+                    val isFilled = i <= glasses
+                    Box(
+                        modifier = Modifier
+                            .size(36.dp)
+                            .clip(RoundedCornerShape(8.dp))
+                            .background(if (isFilled) Color(0xFF00B0FF).copy(alpha = 0.25f) else Color(0xFF1E283D))
+                            .border(
+                                1.dp,
+                                if (isFilled) Color(0xFF00B0FF) else Color(0xFF26324A),
+                                RoundedCornerShape(8.dp)
+                            )
+                            .clickable {
+                                if (glasses == i) onGlassClick(i - 1) else onGlassClick(i)
+                            },
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.WaterDrop,
+                            contentDescription = "Glass $i",
+                            tint = if (isFilled) Color(0xFF00B0FF) else TextMuted,
+                            modifier = Modifier.size(20.dp)
+                        )
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(10.dp))
+
+            Text(
+                text = if (isEnglish) "💧 Drink 8 glasses (250ml each) to boost cognitive stamina and focus by 30%." else "💧 هر لیوان ۲۵۰ سی‌سی؛ نوشیدن آب کافی خستگی ذهنی را رفع کرده و توان تمرکز را تا ۳۰٪ افزایش می‌دهد.",
+                style = MaterialTheme.typography.bodySmall,
+                color = TextSecondary,
+                fontSize = 11.sp
+            )
+        }
+    }
+}
+
+@Composable
+fun BoxBreathingDialog(
+    isEnglish: Boolean,
+    onDismiss: () -> Unit
+) {
+    var currentPhase by remember { mutableIntStateOf(0) } // 0: Inhale, 1: Hold, 2: Exhale, 3: Rest
+    var secondsInPhase by remember { mutableIntStateOf(4) }
+    var currentCycle by remember { mutableIntStateOf(1) }
+    var isRunning by remember { mutableStateOf(true) }
+
+    LaunchedEffect(isRunning, currentPhase, currentCycle) {
+        if (!isRunning) return@LaunchedEffect
+        for (sec in 4 downTo 1) {
+            secondsInPhase = sec
+            delay(1000L)
+        }
+        val nextPhase = (currentPhase + 1) % 4
+        if (nextPhase == 0) {
+            if (currentCycle < 4) {
+                currentCycle += 1
+                currentPhase = 0
+            } else {
+                isRunning = false
+            }
+        } else {
+            currentPhase = nextPhase
+        }
+    }
+
+    val phaseName = when (currentPhase) {
+        0 -> if (isEnglish) "Deep Inhale (Nose)" else "دم عمیق (از بینی)"
+        1 -> if (isEnglish) "Hold Breath" else "حبس نفس"
+        2 -> if (isEnglish) "Slow Exhale (Mouth)" else "بازدم آرام (از دهان)"
+        else -> if (isEnglish) "Rest & Centering" else "سکون و آرامش"
+    }
+
+    val phaseColor = when (currentPhase) {
+        0 -> NeonCyan
+        1 -> NeonAmber
+        2 -> NeonEmerald
+        else -> Color(0xFF9C27B0)
+    }
+
+    val targetScale = when (currentPhase) {
+        0 -> 1.0f
+        1 -> 1.0f
+        2 -> 0.45f
+        else -> 0.45f
+    }
+    val animatedScale by animateFloatAsState(
+        targetValue = targetScale,
+        animationSpec = tween(durationMillis = 3800),
+        label = "breathScale"
+    )
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(Icons.Default.SelfImprovement, contentDescription = null, tint = NeonCyan)
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(
+                    text = if (isEnglish) "Box Breathing Protocol (4-4-4-4)" else "پروتکل تنفس جعبه‌ای ۴-۴-۴-۴",
+                    style = MaterialTheme.typography.titleMedium,
+                    color = NeonCyan,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+        },
+        text = {
+            Column(
+                modifier = Modifier.fillMaxWidth().padding(vertical = 12.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Text(
+                    text = if (isEnglish) "Navy SEAL Protocol: Clear mental fog and conquer cortisol" else "پروتکل هوشمند برای پاکسازی استرس و افزایش تمرکز قبل از روتین",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = TextSecondary,
+                    textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                )
+
+                Spacer(modifier = Modifier.height(24.dp))
+
+                Box(
+                    modifier = Modifier.size(160.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(150.dp * animatedScale)
+                            .clip(CircleShape)
+                            .background(phaseColor.copy(alpha = 0.2f))
+                            .border(2.dp, phaseColor, CircleShape)
+                    )
+                    Box(
+                        modifier = Modifier
+                            .size(100.dp * animatedScale)
+                            .clip(CircleShape)
+                            .background(phaseColor.copy(alpha = 0.4f))
+                    )
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Text(
+                            text = "$secondsInPhase",
+                            style = MaterialTheme.typography.headlineLarge,
+                            color = TextPrimary,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 36.sp
+                        )
+                        Text(
+                            text = if (isEnglish) "Sec" else "ثانیه",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = TextMuted
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(20.dp))
+
+                Text(
+                    text = phaseName,
+                    style = MaterialTheme.typography.titleMedium,
+                    color = phaseColor,
+                    fontWeight = FontWeight.Bold
+                )
+
+                Spacer(modifier = Modifier.height(6.dp))
+
+                Text(
+                    text = if (isEnglish) "Cycle $currentCycle of 4" else "چرخه $currentCycle از ۴",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = TextMuted
+                )
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = onDismiss,
+                colors = ButtonDefaults.buttonColors(containerColor = NeonCyan, contentColor = DarkBackground),
+                shape = RoundedCornerShape(12.dp)
+            ) {
+                Text(if (isEnglish) "Done / Return" else "اتمام و بازگشت", fontWeight = FontWeight.Bold)
+            }
+        },
+        containerColor = DarkSurface,
+        shape = RoundedCornerShape(20.dp)
+    )
 }
 
 @Composable

@@ -12,7 +12,7 @@ service cloud.firestore {
 
     function isAdmin() {
       return isAuthenticated() && 
-        (request.auth.token.email == 'hrhrhrhr0991@gmail.com' || request.auth.token.email == 'hrhrhrhr201111@gmail.com');
+        request.auth.token.email == 'hrhrhrhr0991@gmail.com';
     }
 
     function isValidTimestamp(ts) {

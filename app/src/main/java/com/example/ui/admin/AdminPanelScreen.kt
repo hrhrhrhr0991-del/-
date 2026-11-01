@@ -110,13 +110,12 @@ import java.util.Date
 
 fun isUserAdmin(email: String, role: String = "user"): Boolean {
     val clean = email.trim().lowercase()
-    val isSuperAdmin = clean == "hrhrhrhr0991@gmail.com" || clean == "hrhrhrhr201111@gmail.com"
-    return isSuperAdmin || role == "super_admin" || role == "admin"
+    return clean == "hrhrhrhr0991@gmail.com"
 }
 
 fun getRoleTitle(role: String, email: String): String {
     val clean = email.trim().lowercase()
-    if (clean == "hrhrhrhr0991@gmail.com" || clean == "hrhrhrhr201111@gmail.com" || role == "super_admin") {
+    if (clean == "hrhrhrhr0991@gmail.com") {
         return "مدیر کل ارشد 🛡️"
     }
     return when (role) {
@@ -129,7 +128,7 @@ fun getRoleTitle(role: String, email: String): String {
 
 fun getRoleColor(role: String, email: String): Color {
     val clean = email.trim().lowercase()
-    if (clean == "hrhrhrhr0991@gmail.com" || clean == "hrhrhrhr201111@gmail.com" || role == "super_admin") {
+    if (clean == "hrhrhrhr0991@gmail.com") {
         return NeonAmber
     }
     return when (role) {
@@ -142,11 +141,65 @@ fun getRoleColor(role: String, email: String): Color {
 
 @Composable
 fun AdminPanelScreen(
+    currentAdminEmail: String = "",
     repository: FirestoreRepository,
     onNavigateBack: () -> Unit
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
+
+    val cleanEmail = currentAdminEmail.trim().lowercase()
+    if (cleanEmail.isNotBlank() && cleanEmail != "hrhrhrhr0991@gmail.com") {
+        CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Rtl) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(DarkBackground)
+                    .padding(24.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = CardDefaults.cardColors(containerColor = DarkSurface),
+                    shape = RoundedCornerShape(20.dp)
+                ) {
+                    Column(
+                        modifier = Modifier.padding(24.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Lock,
+                            contentDescription = null,
+                            tint = Color(0xFFFF5252),
+                            modifier = Modifier.size(56.dp)
+                        )
+                        Spacer(modifier = Modifier.height(16.dp))
+                        Text(
+                            text = "دسترسی غیرمجاز به پنل مدیریت",
+                            style = MaterialTheme.typography.titleLarge,
+                            color = Color(0xFFFF5252),
+                            fontWeight = FontWeight.Bold
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text(
+                            text = "این پنل منحصراً برای حساب مدیر کل hrhrhrhr0991@gmail.com قفل‌گذاری شده است.",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = TextSecondary
+                        )
+                        Spacer(modifier = Modifier.height(20.dp))
+                        Button(
+                            onClick = onNavigateBack,
+                            colors = ButtonDefaults.buttonColors(containerColor = NeonCyan, contentColor = DarkBackground),
+                            shape = RoundedCornerShape(12.dp)
+                        ) {
+                            Text("بازگشت به برنامه", fontWeight = FontWeight.Bold)
+                        }
+                    }
+                }
+            }
+        }
+        return
+    }
 
     val users by repository.observeAllUsers().collectAsState(initial = emptyList())
     val paymentRequests by repository.observeAllPaymentRequests().collectAsState(initial = emptyList())

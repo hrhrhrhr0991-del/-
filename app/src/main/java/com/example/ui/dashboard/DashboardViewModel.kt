@@ -94,6 +94,88 @@ class DashboardViewModel(
         }
     }
 
+    private val _waterGlasses = MutableStateFlow(4)
+    val waterGlasses: StateFlow<Int> = _waterGlasses.asStateFlow()
+
+    fun setWaterGlasses(count: Int) {
+        _waterGlasses.value = count.coerceIn(0, 8)
+    }
+
+    fun seedGoldenInternationalRoutines() {
+        viewModelScope.launch {
+            val goldenList = listOf(
+                RoutineTask(
+                    title = "🌅 پروتکل سحرخیزی و تنفس ۴-۴-۴-۴",
+                    type = "wake_voice",
+                    targetTime = "06:30",
+                    strictLockEnabled = true,
+                    description = "تنفس جعبه‌ای ریتمیک جهت اکسیژن‌رسانی به مغز و پاکسازی استرس اول صبح",
+                    category = "صبحگاهی",
+                    priority = "high",
+                    repeatDays = "هر روز"
+                ),
+                RoutineTask(
+                    title = "🛏️ اسکن تصویری تختخواب با جمینای",
+                    type = "bed_inspection",
+                    targetTime = "07:00",
+                    strictLockEnabled = true,
+                    description = "تأیید تصویری اولین پیروزی روز توسط هوش مصنوعی بینایی ماشین",
+                    category = "صبحگاهی",
+                    priority = "high",
+                    repeatDays = "هر روز"
+                ),
+                RoutineTask(
+                    title = "💧 آبرسانی هوشمند (۸ لیوان / ۲۰۰۰ سی‌سی)",
+                    type = "standard",
+                    targetTime = "07:30",
+                    strictLockEnabled = false,
+                    description = "رساندن آب کافی به بدن جهت فعال‌سازی متابولیسم و افزایش ۳۰ درصدی تمرکز",
+                    category = "سلامتی",
+                    priority = "medium",
+                    repeatDays = "هر روز"
+                ),
+                RoutineTask(
+                    title = "⚡ بلاک تمرکز عمیق سایبر (۴۵ دقیقه)",
+                    type = "standard",
+                    targetTime = "09:00",
+                    strictLockEnabled = true,
+                    description = "اجرای کار عمیق و پرچالش بدون چک کردن شبکه‌های اجتماعی و نوتیفیکیشن‌ها",
+                    category = "تمرکز",
+                    priority = "high",
+                    repeatDays = "هر روز"
+                ),
+                RoutineTask(
+                    title = "🧠 تمرین صوتی و بازخوانی بیانیه اراده",
+                    type = "wake_voice",
+                    targetTime = "13:00",
+                    strictLockEnabled = false,
+                    description = "تثبیت خودکارآمدی و قدرت تصمیم‌گیری با هوش مصنوعی صوتی",
+                    category = "انگیزشی",
+                    priority = "medium",
+                    repeatDays = "هر روز"
+                ),
+                RoutineTask(
+                    title = "📖 بازتاب روزانه و ثبت شکرگزاری در دفترچه",
+                    type = "standard",
+                    targetTime = "22:30",
+                    strictLockEnabled = false,
+                    description = "مرور دستاوردهای روز و بستن پرونده‌های ذهنی قبل از خواب آرام",
+                    category = "شبانگاهی",
+                    priority = "high",
+                    repeatDays = "هر روز"
+                )
+            )
+
+            for (task in goldenList) {
+                try {
+                    repository.addRoutine(task)
+                } catch (e: Exception) {
+                    // ignore
+                }
+            }
+        }
+    }
+
     fun deleteRoutine(taskId: String) {
         viewModelScope.launch {
             try {

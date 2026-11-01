@@ -91,6 +91,13 @@ import androidx.compose.foundation.clickable
 import androidx.compose.material.icons.filled.AdminPanelSettings
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.runtime.collectAsState
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
+import androidx.compose.material3.TextButton
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.PasswordVisualTransformation
 import com.example.ui.admin.AdminPanelScreen
 import com.example.ui.admin.getRoleTitle
 import com.example.ui.admin.isUserAdmin
@@ -215,6 +222,7 @@ fun AppNavigation(
             is ActiveScreen.AdminPanel -> {
                 BackHandler { currentScreen = ActiveScreen.TabView(MainTab.PROFILE) }
                 AdminPanelScreen(
+                    currentAdminEmail = currentProfile.email,
                     repository = repository,
                     onNavigateBack = { currentScreen = ActiveScreen.TabView(MainTab.PROFILE) }
                 )
@@ -500,15 +508,17 @@ fun ProfileScreen(
             fontWeight = FontWeight.Bold
         )
 
-        Spacer(modifier = Modifier.height(16.dp))
+        var showAdminPinDialog by remember { mutableStateOf(false) }
+        var enteredAdminPin by remember { mutableStateOf("") }
+        var adminPinError by remember { mutableStateOf<String?>(null) }
 
-        // ADMIN PANEL ACCESS CARD (Exclusive for hrhrhrhr0991@gmail.com)
+        // ADMIN PANEL ACCESS CARD (Exclusive for hrhrhrhr0991@gmail.com with PIN 0991)
         if (isAdmin) {
             Card(
                 modifier = Modifier
                     .fillMaxWidth()
                     .border(1.5.dp, NeonAmber, RoundedCornerShape(18.dp))
-                    .clickable { onOpenAdminPanel() }
+                    .clickable { showAdminPinDialog = true }
                     .testTag("admin_panel_open_card"),
                 colors = CardDefaults.cardColors(containerColor = DarkSurface),
                 shape = RoundedCornerShape(18.dp)
@@ -770,6 +780,108 @@ fun ProfileScreen(
 
         // ACHIEVEMENTS AND MEDALS CARD
         AchievementsCard(userProfile = profile)
+
+        if (showAdminPinDialog) {
+            AlertDialog(
+                onDismissRequest = {
+                    showAdminPinDialog = false
+                    enteredAdminPin = ""
+                    adminPinError = null
+                },
+                title = {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Icons.Default.Security, contentDescription = null, tint = NeonAmber)
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = "تأیید هویت مدیر کل اراده 🛡️",
+                            color = NeonAmber,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 16.sp
+                        )
+                    }
+                },
+                text = {
+                    Column {
+                        Text(
+                            text = "حساب کاربری: ${profile.email}",
+                            color = NeonCyan,
+                            style = MaterialTheme.typography.bodySmall,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Spacer(modifier = Modifier.height(6.dp))
+                        Text(
+                            text = "جهت ورود به پنل مدیریت، رمز مستر ۴ رقمی (PIN: 0991) را وارد کنید:",
+                            color = TextSecondary,
+                            style = MaterialTheme.typography.bodySmall
+                        )
+                        Spacer(modifier = Modifier.height(14.dp))
+                        OutlinedTextField(
+                            value = enteredAdminPin,
+                            onValueChange = {
+                                if (it.length <= 6) {
+                                    enteredAdminPin = it
+                                    adminPinError = null
+                                }
+                            },
+                            label = { Text("رمز عبور مدیر (PIN)") },
+                            singleLine = true,
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword),
+                            visualTransformation = PasswordVisualTransformation(),
+                            modifier = Modifier.fillMaxWidth().testTag("admin_pin_input"),
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedBorderColor = NeonAmber,
+                                unfocusedBorderColor = Color(0xFF26324A),
+                                focusedTextColor = TextPrimary,
+                                unfocusedTextColor = TextPrimary
+                            ),
+                            isError = adminPinError != null
+                        )
+                        if (adminPinError != null) {
+                            Spacer(modifier = Modifier.height(6.dp))
+                            Text(
+                                text = adminPinError.orEmpty(),
+                                color = Color(0xFFFF5252),
+                                style = MaterialTheme.typography.labelSmall
+                            )
+                        }
+                    }
+                },
+                confirmButton = {
+                    Button(
+                        onClick = {
+                            val clean = profile.email.trim().lowercase()
+                            if (clean == "hrhrhrhr0991@gmail.com" && enteredAdminPin.trim() == "0991") {
+                                showAdminPinDialog = false
+                                enteredAdminPin = ""
+                                adminPinError = null
+                                onOpenAdminPanel()
+                            } else if (clean != "hrhrhrhr0991@gmail.com") {
+                                adminPinError = "تنها حساب hrhrhrhr0991@gmail.com مجاز به ورود به پنل مدیریت است."
+                            } else {
+                                adminPinError = "رمز عبور اشتباه است! دسترسی غیرمجاز."
+                            }
+                        },
+                        colors = ButtonDefaults.buttonColors(containerColor = NeonAmber, contentColor = DarkBackground),
+                        modifier = Modifier.testTag("submit_admin_pin_btn")
+                    ) {
+                        Text("ورود به مدیریت", fontWeight = FontWeight.Bold)
+                    }
+                },
+                dismissButton = {
+                    TextButton(
+                        onClick = {
+                            showAdminPinDialog = false
+                            enteredAdminPin = ""
+                            adminPinError = null
+                        }
+                    ) {
+                        Text("انصراف", color = TextSecondary)
+                    }
+                },
+                containerColor = DarkSurface,
+                shape = RoundedCornerShape(16.dp)
+            )
+        }
 
         Spacer(modifier = Modifier.height(80.dp))
     }

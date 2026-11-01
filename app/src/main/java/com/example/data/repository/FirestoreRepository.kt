@@ -80,11 +80,19 @@ class FirestoreRepository(
         }
 
         val cleanEmail = email.trim().lowercase()
-        val isSuperAdminEmail = cleanEmail == "hrhrhrhr0991@gmail.com" || cleanEmail == "hrhrhrhr201111@gmail.com"
+        val isSuperAdminEmail = cleanEmail == "hrhrhrhr0991@gmail.com"
 
         if (snapshot != null && snapshot.exists()) {
             val profile = snapshot.toObject(UserProfile::class.java)
             if (profile != null) {
+                if (!isSuperAdminEmail && (profile.role == "super_admin" || profile.role == "admin")) {
+                    try {
+                        userDoc.update("role", "user").await()
+                        return profile.copy(role = "user")
+                    } catch (e: Exception) {
+                        return profile.copy(role = "user")
+                    }
+                }
                 if (isSuperAdminEmail && profile.role != "super_admin") {
                     try {
                         userDoc.update("role", "super_admin").await()
