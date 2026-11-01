@@ -14,6 +14,7 @@ import com.google.firebase.Timestamp
 import com.google.firebase.auth.auth
 import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.firestore.SetOptions
 import com.google.firebase.firestore.snapshots
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.catch
@@ -43,10 +44,12 @@ class FirestoreRepository(
     )
 
     private val auth = Firebase.auth
+    var localActiveUserId: String? = null
 
     fun requireUserId(): String {
         return auth.currentUser?.uid
-            ?: throw IllegalStateException("User must be signed in before accessing Firestore.")
+            ?: localActiveUserId
+            ?: "local_user_default"
     }
 
     // 1. User Profile Observation and Creation
@@ -58,7 +61,7 @@ class FirestoreRepository(
                 .map { snapshot -> snapshot.toObject(UserProfile::class.java) }
                 .catch { error ->
                     if (error is Exception) handleFirestoreError(error, OperationType.GET, path)
-                    throw error
+                    emit(null)
                 }
         )
     }
@@ -134,28 +137,28 @@ class FirestoreRepository(
 
         try {
             userDoc.set(newProfileMap).await()
-            // New users start completely clean (0 routines / صفر صفر) as requested
-            return UserProfile(
-                id = userId,
-                userId = userId,
-                email = email,
-                phoneNumber = phoneNumber,
-                displayName = displayName,
-                role = initialRole,
-                unlockedBadges = emptyList(),
-                adminNote = "",
-                isBanned = false,
-                trialStartDate = trialStart,
-                trialEndDate = trialEnd,
-                streakCount = 1L,
-                isSubscribed = isSuperAdminEmail
-            )
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
             handleFirestoreError(e, OperationType.CREATE, userDoc.path)
-            throw e
+            // Still return UserProfile so offline/VPN-free user can use the app smoothly
         }
+
+        return UserProfile(
+            id = userId,
+            userId = userId,
+            email = email,
+            phoneNumber = phoneNumber,
+            displayName = displayName,
+            role = initialRole,
+            unlockedBadges = emptyList(),
+            adminNote = "",
+            isBanned = false,
+            trialStartDate = trialStart,
+            trialEndDate = trialEnd,
+            streakCount = 1L,
+            isSubscribed = isSuperAdminEmail
+        )
     }
 
     private suspend fun seedDefaultRoutines(userId: String) {
@@ -213,7 +216,7 @@ class FirestoreRepository(
                 .map { snapshot -> snapshot.toObjects(RoutineTask::class.java) }
                 .catch { error ->
                     if (error is Exception) handleFirestoreError(error, OperationType.LIST, path)
-                    throw error
+                    emit(emptyList())
                 }
         )
     }
@@ -395,18 +398,19 @@ class FirestoreRepository(
         val uid = requireUserId()
         val userDoc = db.collection("users").document(uid)
         try {
-            userDoc.update(
+            userDoc.set(
                 mapOf(
+                    "userId" to uid,
                     "displayName" to displayName,
                     "phoneNumber" to phoneNumber,
                     "updatedAt" to FieldValue.serverTimestamp()
-                )
+                ),
+                SetOptions.merge()
             ).await()
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
             handleFirestoreError(e, OperationType.UPDATE, userDoc.path)
-            throw e
         }
     }
 

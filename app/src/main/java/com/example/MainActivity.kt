@@ -42,7 +42,7 @@ class MainActivity : ComponentActivity() {
 
         val repository = FirestoreRepository(this)
         val aiManager = GeminiAiManager()
-        val authViewModel = AuthViewModel(repository)
+        val authViewModel = AuthViewModel(repository, this)
 
         setContent {
             EradehTheme {
