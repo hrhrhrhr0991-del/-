@@ -25,6 +25,9 @@ data class UserProfile(
     val unlockedBadges: List<String> = emptyList(),
     val adminNote: String = "",
     val isBanned: Boolean = false,
+    val handle: String = "",
+    val isVerified: Boolean = false,
+    val progressPercent: Int = 0,
     @ServerTimestamp val createdAt: Timestamp? = null,
     @ServerTimestamp val updatedAt: Timestamp? = null
 )

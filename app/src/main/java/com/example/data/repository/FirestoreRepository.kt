@@ -2,7 +2,9 @@ package com.example.data.repository
 
 import android.content.Context
 import com.example.R
+import com.example.data.model.BroadcastPost
 import com.example.data.model.PaymentRequest
+import com.example.data.model.PeerMessage
 import com.example.data.model.RoutineTask
 import com.example.data.model.UserNote
 import com.example.data.model.UserProfile
@@ -85,26 +87,51 @@ class FirestoreRepository(
         val cleanEmail = email.trim().lowercase()
         val isSuperAdminEmail = cleanEmail == "hrhrhrhr0991@gmail.com"
 
+        val cleanPhoneDigits = phoneNumber.filter { it.isDigit() }
+        val defaultHandle = if (isSuperAdminEmail) "@eradeh_admin" else if (cleanPhoneDigits.isNotBlank()) "@$cleanPhoneDigits" else "@user_${userId.takeLast(5)}"
+        val initialStreak = if (isSuperAdminEmail) 1L else 0L
+
         if (snapshot != null && snapshot.exists()) {
             val profile = snapshot.toObject(UserProfile::class.java)
             if (profile != null) {
+                var updatedProfile = profile
                 if (!isSuperAdminEmail && (profile.role == "super_admin" || profile.role == "admin")) {
                     try {
                         userDoc.update("role", "user").await()
-                        return profile.copy(role = "user")
+                        updatedProfile = updatedProfile.copy(role = "user")
                     } catch (e: Exception) {
-                        return profile.copy(role = "user")
+                        updatedProfile = updatedProfile.copy(role = "user")
                     }
                 }
-                if (isSuperAdminEmail && profile.role != "super_admin") {
+                if (isSuperAdminEmail && (profile.role != "super_admin" || !profile.isVerified)) {
                     try {
-                        userDoc.update("role", "super_admin").await()
-                        return profile.copy(role = "super_admin")
+                        userDoc.update(
+                            mapOf(
+                                "role" to "super_admin",
+                                "isVerified" to true,
+                                "handle" to "@eradeh_admin",
+                                "isSubscribed" to true
+                            )
+                        ).await()
+                        updatedProfile = updatedProfile.copy(
+                            role = "super_admin",
+                            isVerified = true,
+                            handle = "@eradeh_admin",
+                            isSubscribed = true
+                        )
                     } catch (e: Exception) {
-                        return profile
+                        // ignore
                     }
                 }
-                return profile
+                if (updatedProfile.handle.isBlank()) {
+                    try {
+                        userDoc.update("handle", defaultHandle).await()
+                        updatedProfile = updatedProfile.copy(handle = defaultHandle)
+                    } catch (e: Exception) {
+                        // ignore
+                    }
+                }
+                return updatedProfile
             }
         }
 
@@ -123,12 +150,15 @@ class FirestoreRepository(
             "phoneNumber" to phoneNumber,
             "displayName" to displayName,
             "role" to initialRole,
+            "handle" to defaultHandle,
+            "isVerified" to isSuperAdminEmail,
+            "progressPercent" to 0,
             "unlockedBadges" to emptyList<String>(),
             "adminNote" to "",
             "isBanned" to false,
             "trialStartDate" to trialStart,
             "trialEndDate" to trialEnd,
-            "streakCount" to 1L,
+            "streakCount" to initialStreak,
             "isSubscribed" to isSuperAdminEmail,
             "lastActiveDate" to java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.US).format(now),
             "createdAt" to FieldValue.serverTimestamp(),
@@ -151,12 +181,15 @@ class FirestoreRepository(
             phoneNumber = phoneNumber,
             displayName = displayName,
             role = initialRole,
+            handle = defaultHandle,
+            isVerified = isSuperAdminEmail,
+            progressPercent = 0,
             unlockedBadges = emptyList(),
             adminNote = "",
             isBanned = false,
             trialStartDate = trialStart,
             trialEndDate = trialEnd,
-            streakCount = 1L,
+            streakCount = initialStreak,
             isSubscribed = isSuperAdminEmail
         )
     }
@@ -687,9 +720,22 @@ class FirestoreRepository(
         email: String,
         phone: String,
         role: String,
-        durationDays: Long
+        durationDays: Long,
+        unlockedBadges: List<String> = emptyList(),
+        isVerified: Boolean = false,
+        customHandle: String = ""
     ): UserProfile {
-        val newUserId = "user_manual_${System.currentTimeMillis().toString().takeLast(8)}"
+        val cleanPhoneDigits = phone.filter { it.isDigit() }
+        val generatedHandle = if (customHandle.isNotBlank()) {
+            if (customHandle.startsWith("@")) customHandle else "@$customHandle"
+        } else if (cleanPhoneDigits.isNotBlank()) {
+            "@$cleanPhoneDigits"
+        } else {
+            "@user_${System.currentTimeMillis().toString().takeLast(5)}"
+        }
+
+        val newUserId = "usr_" + (if (email.isNotBlank()) email else phone.ifBlank { System.currentTimeMillis().toString() })
+            .replace(Regex("[^a-zA-Z0-9]"), "_")
         val userDoc = db.collection("users").document(newUserId)
         val now = Date()
         val calendar = Calendar.getInstance().apply {
@@ -705,22 +751,24 @@ class FirestoreRepository(
             "phoneNumber" to phone,
             "displayName" to displayName,
             "role" to role,
-            "unlockedBadges" to emptyList<String>(),
+            "handle" to generatedHandle,
+            "isVerified" to isVerified,
+            "progressPercent" to 0,
+            "unlockedBadges" to unlockedBadges,
             "adminNote" to "",
             "isBanned" to false,
             "trialStartDate" to trialStart,
             "trialEndDate" to trialEnd,
-            "streakCount" to 1L,
+            "streakCount" to 0L,
             "isSubscribed" to (durationDays > 14),
-            "subscriptionPlan" to if (durationDays > 14) "ثبت مستقیم مدیریت" else "",
+            "subscriptionPlan" to if (durationDays > 14) "ثبت مستقیم مدیریت" else "آزمایشی ۱۴ روزه",
             "lastActiveDate" to java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.US).format(now),
             "createdAt" to FieldValue.serverTimestamp(),
             "updatedAt" to FieldValue.serverTimestamp()
         )
 
         try {
-            userDoc.set(newProfileMap).await()
-            // New users start clean with zero routines (صفر صفر)
+            userDoc.set(newProfileMap, SetOptions.merge()).await()
             return UserProfile(
                 id = newUserId,
                 userId = newUserId,
@@ -728,14 +776,17 @@ class FirestoreRepository(
                 phoneNumber = phone,
                 displayName = displayName,
                 role = role,
-                unlockedBadges = emptyList(),
+                handle = generatedHandle,
+                isVerified = isVerified,
+                progressPercent = 0,
+                unlockedBadges = unlockedBadges,
                 adminNote = "",
                 isBanned = false,
                 trialStartDate = trialStart,
                 trialEndDate = trialEnd,
-                streakCount = 1L,
+                streakCount = 0L,
                 isSubscribed = (durationDays > 14),
-                subscriptionPlan = if (durationDays > 14) "ثبت مستقیم مدیریت" else ""
+                subscriptionPlan = if (durationDays > 14) "ثبت مستقیم مدیریت" else "آزمایشی ۱۴ روزه"
             )
         } catch (e: CancellationException) {
             throw e
@@ -743,5 +794,208 @@ class FirestoreRepository(
             handleFirestoreError(e, OperationType.CREATE, userDoc.path)
             throw e
         }
+    }
+
+    suspend fun updateUserHandle(userId: String, newHandle: String): Boolean {
+        val clean = if (newHandle.startsWith("@")) newHandle.trim() else "@${newHandle.trim()}"
+        if (clean.length < 3) return false
+        val userDoc = db.collection("users").document(userId)
+        return try {
+            userDoc.update(
+                mapOf(
+                    "handle" to clean,
+                    "updatedAt" to FieldValue.serverTimestamp()
+                )
+            ).await()
+            true
+        } catch (e: Exception) {
+            handleFirestoreError(e, OperationType.UPDATE, userDoc.path)
+            false
+        }
+    }
+
+    suspend fun toggleUserVerified(userId: String, isVerified: Boolean) {
+        val userDoc = db.collection("users").document(userId)
+        try {
+            userDoc.update(
+                mapOf(
+                    "isVerified" to isVerified,
+                    "updatedAt" to FieldValue.serverTimestamp()
+                )
+            ).await()
+        } catch (e: Exception) {
+            handleFirestoreError(e, OperationType.UPDATE, userDoc.path)
+        }
+    }
+
+    suspend fun cleanUpAllNonAdminUsers(): Int {
+        val usersCollection = db.collection("users")
+        var deletedCount = 0
+        try {
+            val snapshot = usersCollection.get().await()
+            for (doc in snapshot.documents) {
+                val email = doc.getString("email")?.trim()?.lowercase().orEmpty()
+                val role = doc.getString("role")?.trim()?.lowercase().orEmpty()
+                val docId = doc.id
+                // Keep only the single super-admin
+                val isTrueAdmin = (email == "hrhrhrhr0991@gmail.com" || docId == "usr_hrhrhrhr0991_gmail_com") && role == "super_admin"
+                if (!isTrueAdmin) {
+                    try {
+                        usersCollection.document(docId).delete().await()
+                        deletedCount++
+                    } catch (e: Exception) {
+                        // ignore individual delete failure
+                    }
+                }
+            }
+            // Ensure the single true super-admin exists and is pristine
+            val adminDoc = usersCollection.document("usr_hrhrhrhr0991_gmail_com")
+            adminDoc.set(
+                mapOf(
+                    "userId" to "usr_hrhrhrhr0991_gmail_com",
+                    "email" to "hrhrhrhr0991@gmail.com",
+                    "phoneNumber" to "09910000000",
+                    "displayName" to "مدیریت اراده",
+                    "role" to "super_admin",
+                    "handle" to "@eradeh_admin",
+                    "isVerified" to true,
+                    "isSubscribed" to true,
+                    "subscriptionPlan" to "مدیریت کل ارشد",
+                    "streakCount" to 1L,
+                    "unlockedBadges" to listOf("master_admin", "legend_streak"),
+                    "updatedAt" to FieldValue.serverTimestamp()
+                ),
+                SetOptions.merge()
+            ).await()
+        } catch (e: Exception) {
+            handleFirestoreError(e, OperationType.LIST, "users")
+        }
+        return deletedCount
+    }
+
+    // --- BROADCASTS & OFFICIAL ANNOUNCEMENTS ---
+    fun observeBroadcasts(): Flow<List<BroadcastPost>> = flow {
+        val col = db.collection("broadcasts")
+        emitAll(
+            col.orderBy("createdAt", com.google.firebase.firestore.Query.Direction.DESCENDING)
+                .snapshots()
+                .map { snap -> snap.toObjects(BroadcastPost::class.java) }
+                .catch { emit(emptyList()) }
+        )
+    }
+
+    suspend fun publishBroadcast(
+        title: String,
+        content: String,
+        authorName: String = "مدیریت اراده",
+        tag: String = "اعلان مهم"
+    ): Boolean {
+        return try {
+            val docRef = db.collection("broadcasts").document()
+            val map = mapOf(
+                "title" to title,
+                "content" to content,
+                "authorName" to authorName,
+                "authorRole" to "مدیر کل ارشد",
+                "isVerified" to true,
+                "tag" to tag,
+                "likesCount" to 0L,
+                "likedUserIds" to emptyList<String>(),
+                "createdAt" to FieldValue.serverTimestamp()
+            )
+            docRef.set(map).await()
+            true
+        } catch (e: Exception) {
+            false
+        }
+    }
+
+    suspend fun toggleLikeBroadcast(broadcastId: String, userId: String) {
+        val docRef = db.collection("broadcasts").document(broadcastId)
+        try {
+            val snap = docRef.get().await()
+            val post = snap.toObject(BroadcastPost::class.java) ?: return
+            val alreadyLiked = post.likedUserIds.contains(userId)
+            if (alreadyLiked) {
+                docRef.update(
+                    mapOf(
+                        "likesCount" to (post.likesCount - 1).coerceAtLeast(0L),
+                        "likedUserIds" to FieldValue.arrayRemove(userId)
+                    )
+                ).await()
+            } else {
+                docRef.update(
+                    mapOf(
+                        "likesCount" to post.likesCount + 1,
+                        "likedUserIds" to FieldValue.arrayUnion(userId)
+                    )
+                ).await()
+            }
+        } catch (e: Exception) {
+            // ignore
+        }
+    }
+
+    // --- PEER MESSAGING & MOTIVATIONAL EXCHANGE ---
+    fun observeReceivedMessages(recipientId: String, recipientHandle: String): Flow<List<PeerMessage>> = flow {
+        val col = db.collection("peer_messages")
+        emitAll(
+            col.orderBy("createdAt", com.google.firebase.firestore.Query.Direction.DESCENDING)
+                .snapshots()
+                .map { snap ->
+                    snap.toObjects(PeerMessage::class.java).filter {
+                        it.recipientId == recipientId || (recipientHandle.isNotBlank() && it.recipientHandle == recipientHandle)
+                    }
+                }
+                .catch { emit(emptyList()) }
+        )
+    }
+
+    suspend fun sendPeerMessage(
+        sender: UserProfile,
+        recipient: UserProfile,
+        messageText: String,
+        type: String = "motivation",
+        progressPercent: Int = 0
+    ): Boolean {
+        return try {
+            val docRef = db.collection("peer_messages").document()
+            val map = mapOf(
+                "senderId" to sender.userId,
+                "senderName" to sender.displayName.ifBlank { "همراه اراده" },
+                "senderHandle" to sender.handle,
+                "senderIsVerified" to sender.isVerified,
+                "recipientId" to recipient.userId,
+                "recipientHandle" to recipient.handle,
+                "messageText" to messageText,
+                "messageType" to type,
+                "progressPercent" to progressPercent,
+                "createdAt" to FieldValue.serverTimestamp()
+            )
+            docRef.set(map).await()
+            true
+        } catch (e: Exception) {
+            false
+        }
+    }
+
+    fun searchUsers(query: String): Flow<List<UserProfile>> = flow {
+        val clean = query.trim().lowercase()
+        if (clean.isBlank()) {
+            emit(emptyList())
+            return@flow
+        }
+        val col = db.collection("users")
+        emitAll(
+            col.snapshots()
+                .map { snap ->
+                    snap.toObjects(UserProfile::class.java).filter { user ->
+                        user.handle.lowercase().contains(clean) ||
+                        user.displayName.lowercase().contains(clean) ||
+                        user.phoneNumber.contains(clean)
+                    }.take(15)
+                }
+                .catch { emit(emptyList()) }
+        )
     }
 }

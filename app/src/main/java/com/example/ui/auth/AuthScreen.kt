@@ -2,6 +2,7 @@ package com.example.ui.auth
 
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -22,17 +23,13 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Bolt
 import androidx.compose.material.icons.filled.CardGiftcard
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Email
-import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Phone
-import androidx.compose.material.icons.filled.Public
 import androidx.compose.material.icons.filled.Security
-import androidx.compose.material.icons.filled.VerifiedUser
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -40,8 +37,8 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
@@ -57,16 +54,18 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
-import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.R
 import com.example.ui.theme.DarkBackground
 import com.example.ui.theme.DarkSurface
 import com.example.ui.theme.NeonAmber
@@ -82,9 +81,9 @@ fun AuthScreen(
     uiState: AuthUiState
 ) {
     val context = LocalContext.current
-    var emailOrPhoneInput by remember { mutableStateOf("") }
-    var displayNameInput by remember { mutableStateOf("") }
-    val showSuggestion by authViewModel.showDirectLoginSuggestion.collectAsState()
+    var fullNameInput by remember { mutableStateOf("") }
+    var phoneNumberInput by remember { mutableStateOf("") }
+    var emailInput by remember { mutableStateOf("") }
 
     CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Rtl) {
         Box(
@@ -92,7 +91,7 @@ fun AuthScreen(
                 .fillMaxSize()
                 .background(
                     Brush.verticalGradient(
-                        listOf(DarkBackground, Color(0xFF0F1522), DarkBackground)
+                        listOf(DarkBackground, Color(0xFF0C1322), DarkBackground)
                     )
                 )
                 .padding(horizontal = 20.dp)
@@ -105,22 +104,26 @@ fun AuthScreen(
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.Center
             ) {
-                // Futuristic Glowing App Logo
+                // Official Stylized Neon Masked App Logo (No bulky background)
                 Box(
                     modifier = Modifier
-                        .size(80.dp)
+                        .size(92.dp)
                         .clip(CircleShape)
-                        .background(
-                            Brush.linearGradient(listOf(NeonCyan.copy(alpha = 0.25f), NeonEmerald.copy(alpha = 0.25f)))
-                        )
-                        .border(2.dp, NeonEmerald, CircleShape),
+                        .background(Color.Transparent)
+                        .border(
+                            2.5.dp,
+                            Brush.sweepGradient(listOf(NeonCyan, NeonAmber, NeonEmerald, NeonCyan)),
+                            CircleShape
+                        ),
                     contentAlignment = Alignment.Center
                 ) {
-                    Icon(
-                        imageVector = Icons.Default.Security,
+                    Image(
+                        painter = painterResource(id = R.drawable.eradeh_launcher_icon_1793471008063),
                         contentDescription = "Eradeh Logo",
-                        tint = NeonEmerald,
-                        modifier = Modifier.size(44.dp)
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .clip(CircleShape),
+                        contentScale = ContentScale.Crop
                     )
                 }
 
@@ -178,7 +181,7 @@ fun AuthScreen(
                                     fontWeight = FontWeight.Bold
                                 )
                                 Text(
-                                    text = "بدون نیاز به ثبت کارت بانکی یا پرداخت وجه",
+                                    text = "بدون نیاز به ثبت کارت بانکی یا پرداخت وجه اولیه",
                                     style = MaterialTheme.typography.bodySmall,
                                     color = TextMuted,
                                     fontSize = 11.sp
@@ -216,11 +219,24 @@ fun AuthScreen(
                             fontWeight = FontWeight.Bold
                         )
                         Text(
-                            text = "با حساب گوگل یا شماره موبایل خود وارد شوید",
+                            text = "نام و شماره همراه خود را وارد کنید",
                             style = MaterialTheme.typography.bodySmall,
                             color = TextSecondary,
-                            modifier = Modifier.padding(top = 4.dp, bottom = 16.dp)
+                            modifier = Modifier.padding(top = 4.dp, bottom = 14.dp)
                         )
+
+                        // Animated Neon Fast Progress Indicator when entering the app
+                        if (uiState is AuthUiState.Loading) {
+                            LinearProgressIndicator(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(4.dp)
+                                    .clip(RoundedCornerShape(2.dp))
+                                    .padding(bottom = 12.dp),
+                                color = NeonCyan,
+                                trackColor = NeonCyan.copy(alpha = 0.2f)
+                            )
+                        }
 
                         // Error Banner (if any)
                         if (uiState is AuthUiState.Error) {
@@ -254,17 +270,41 @@ fun AuthScreen(
                             }
                         }
 
-                        // Email or Phone Input (or secret admin passcode 128110128110)
+                        // FIELD 1: FULL NAME (MANDATORY & FIRST)
                         OutlinedTextField(
-                            value = emailOrPhoneInput,
+                            value = fullNameInput,
                             onValueChange = {
-                                emailOrPhoneInput = it
+                                fullNameInput = it
                                 authViewModel.clearError()
                             },
-                            label = { Text("ایمیل حساب گوگل یا شماره همراه") },
-                            placeholder = { Text("name@gmail.com یا 0912...") },
+                            label = { Text("نام و نام خانوادگی (الزامی)") },
+                            placeholder = { Text("مثال: علی رضایی یا کد ۱۲۸") },
                             leadingIcon = {
-                                Icon(Icons.Default.Email, contentDescription = null, tint = NeonCyan)
+                                Icon(Icons.Default.Person, contentDescription = null, tint = NeonCyan)
+                            },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .testTag("full_name_input"),
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedBorderColor = NeonCyan,
+                                unfocusedBorderColor = Color(0xFF26324A)
+                            ),
+                            singleLine = true
+                        )
+
+                        Spacer(modifier = Modifier.height(10.dp))
+
+                        // FIELD 2: PHONE NUMBER (MANDATORY & SECOND)
+                        OutlinedTextField(
+                            value = phoneNumberInput,
+                            onValueChange = {
+                                phoneNumberInput = it
+                                authViewModel.clearError()
+                            },
+                            label = { Text("شماره تماس همراه (الزامی)") },
+                            placeholder = { Text("مثال: 09123456789 یا کد ۱۱۰") },
+                            leadingIcon = {
+                                Icon(Icons.Default.Phone, contentDescription = null, tint = NeonCyan)
                             },
                             modifier = Modifier
                                 .fillMaxWidth()
@@ -274,34 +314,43 @@ fun AuthScreen(
                                 unfocusedBorderColor = Color(0xFF26324A)
                             ),
                             singleLine = true,
-                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email)
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone)
                         )
 
                         Spacer(modifier = Modifier.height(10.dp))
 
-                        // Optional Display Name
+                        // FIELD 3: GOOGLE EMAIL (OPTIONAL & THIRD)
                         OutlinedTextField(
-                            value = displayNameInput,
-                            onValueChange = { displayNameInput = it },
-                            label = { Text("نام شما (اختیاری)") },
-                            placeholder = { Text("نام یا عنوان دلخواه") },
+                            value = emailInput,
+                            onValueChange = {
+                                emailInput = it
+                                authViewModel.clearError()
+                            },
+                            label = { Text("ایمیل حساب گوگل (اختیاری)") },
+                            placeholder = { Text("name@gmail.com (اختیاری)") },
                             leadingIcon = {
-                                Icon(Icons.Default.Person, contentDescription = null, tint = TextMuted)
+                                Icon(Icons.Default.Email, contentDescription = null, tint = TextMuted)
                             },
                             modifier = Modifier.fillMaxWidth(),
                             colors = OutlinedTextFieldDefaults.colors(
                                 focusedBorderColor = NeonCyan,
                                 unfocusedBorderColor = Color(0xFF26324A)
                             ),
-                            singleLine = true
+                            singleLine = true,
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email)
                         )
 
                         Spacer(modifier = Modifier.height(18.dp))
 
-                        // Primary Action: Google Sign-In Button
+                        // SINGLE PRIMARY LOGIN BUTTON
                         Button(
                             onClick = {
-                                authViewModel.signInWithGoogle(context, emailOrPhoneInput)
+                                authViewModel.signInWithDetails(
+                                    context = context,
+                                    name = fullNameInput,
+                                    phone = phoneNumberInput,
+                                    email = emailInput
+                                )
                             },
                             modifier = Modifier
                                 .fillMaxWidth()
@@ -323,50 +372,17 @@ fun AuthScreen(
                             } else {
                                 Row(verticalAlignment = Alignment.CenterVertically) {
                                     Icon(
-                                        imageVector = Icons.Default.Public,
+                                        imageVector = Icons.Default.Bolt,
                                         contentDescription = null,
                                         modifier = Modifier.size(20.dp)
                                     )
                                     Spacer(modifier = Modifier.width(8.dp))
                                     Text(
-                                        text = "ورود با حساب گوگل",
+                                        text = "ورود به برنامه اراده 🚀",
                                         style = MaterialTheme.typography.titleMedium,
                                         fontWeight = FontWeight.Bold
                                     )
                                 }
-                            }
-                        }
-
-                        Spacer(modifier = Modifier.height(10.dp))
-
-                        // Secondary Action: Direct Login Button
-                        OutlinedButton(
-                            onClick = {
-                                authViewModel.signInWithoutVpn(
-                                    context = context,
-                                    input = emailOrPhoneInput.ifBlank { "user@gmail.com" },
-                                    name = displayNameInput
-                                )
-                            },
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(48.dp)
-                                .testTag("direct_sign_in_button"),
-                            colors = ButtonDefaults.outlinedButtonColors(
-                                contentColor = NeonEmerald
-                            ),
-                            border = BorderStroke(1.dp, NeonEmerald.copy(alpha = 0.5f)),
-                            shape = RoundedCornerShape(14.dp),
-                            enabled = uiState !is AuthUiState.Loading
-                        ) {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Icon(Icons.Default.Bolt, contentDescription = null, modifier = Modifier.size(18.dp))
-                                Spacer(modifier = Modifier.width(6.dp))
-                                Text(
-                                    text = "ورود مستقیم بدون معطلی",
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    fontWeight = FontWeight.Bold
-                                )
                             }
                         }
 

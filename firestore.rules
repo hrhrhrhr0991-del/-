@@ -17,28 +17,27 @@ service cloud.firestore {
     }
 
     match /users/{userId} {
-      allow read: if isOwner(userId) || isAdmin();
-      allow list: if isAdmin();
+      allow read, list: if true;
       allow create: if isOwner(userId) || isAdmin();
       allow update: if isOwner(userId) || isAdmin();
       allow delete: if isOwner(userId) || isAdmin();
 
       match /routines/{routineId} {
-        allow read: if isOwner(userId) || isAdmin();
+        allow read, list: if isOwner(userId) || isAdmin();
         allow create: if isOwner(userId) || isAdmin();
         allow update: if isOwner(userId) || isAdmin();
         allow delete: if isOwner(userId) || isAdmin();
       }
 
       match /verifications/{verificationId} {
-        allow read: if isOwner(userId) || isAdmin();
+        allow read, list: if isOwner(userId) || isAdmin();
         allow create: if isOwner(userId) || isAdmin();
         allow update: if isOwner(userId) || isAdmin();
         allow delete: if isOwner(userId) || isAdmin();
       }
 
       match /notes/{noteId} {
-        allow read: if isOwner(userId) || isAdmin();
+        allow read, list: if isOwner(userId) || isAdmin();
         allow create: if isOwner(userId) || isAdmin();
         allow update: if isOwner(userId) || isAdmin();
         allow delete: if isOwner(userId) || isAdmin();
@@ -46,11 +45,15 @@ service cloud.firestore {
     }
 
     match /payment_requests/{requestId} {
-      allow create: if true;
-      allow read: if true;
-      allow list: if true;
-      allow update: if true;
-      allow delete: if true;
+      allow create, read, list, update, delete: if true;
+    }
+
+    match /broadcasts/{broadcastId} {
+      allow create, read, list, update, delete: if true;
+    }
+
+    match /peer_messages/{msgId} {
+      allow create, read, list, update, delete: if true;
     }
   }
 }

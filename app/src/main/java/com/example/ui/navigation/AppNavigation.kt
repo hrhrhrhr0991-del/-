@@ -36,6 +36,7 @@ import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
@@ -47,7 +48,9 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import kotlinx.coroutines.launch
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -65,6 +68,7 @@ import com.example.data.model.RoutineTask
 import com.example.data.model.UserProfile
 import com.example.data.repository.FirestoreRepository
 import com.example.ui.auth.AuthViewModel
+import com.example.ui.auth.CompleteProfileDialog
 import com.example.ui.challenge.BedInspectionScreen
 import com.example.ui.challenge.MorningWakeupScreen
 import com.example.ui.dashboard.DashboardScreen
@@ -101,14 +105,19 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import com.example.ui.admin.AdminPanelScreen
 import com.example.ui.admin.getRoleTitle
 import com.example.ui.admin.isUserAdmin
-import com.example.ui.auth.CompleteProfileDialog
+import androidx.compose.material.icons.filled.Campaign
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.Forum
+import androidx.compose.material.icons.filled.Verified
+import com.example.ui.community.CommunityScreen
 import com.example.ui.subscription.SubscriptionScreen
 
 enum class MainTab(val title: String, val icon: ImageVector) {
     DASHBOARD("داشبورد", Icons.Default.Home),
     CHALLENGES("چالش‌ها", Icons.Default.Assignment),
+    COMMUNITY("گفت‌وگو", Icons.Default.Forum),
     FOCUS("تمرکز", Icons.Default.HourglassBottom),
-    NOTES("یادداشت‌ها", Icons.Default.NoteAlt),
     PROFILE("پروفایل", Icons.Default.Person)
 }
 
@@ -297,61 +306,125 @@ fun AppNavigation(
                     },
                     containerColor = DarkBackground
                 ) { paddingValues ->
-                    Box(modifier = Modifier.padding(paddingValues)) {
-                        when (screen.tab) {
-                            MainTab.DASHBOARD -> {
-                                DashboardScreen(
-                                    currentUserId = currentUserId,
-                                    viewModel = dashboardViewModel,
-                                    aiManager = aiManager,
-                                    onNavigateToBedChallenge = { task ->
-                                        currentScreen = ActiveScreen.BedChallenge(task)
-                                    },
-                                    onNavigateToVoiceChallenge = { task ->
-                                        currentScreen = ActiveScreen.VoiceChallenge(task)
-                                    }
-                                )
-                            }
-                            MainTab.CHALLENGES -> {
-                                ChallengesHubScreen(
-                                    onOpenBedChallenge = {
-                                        currentScreen = ActiveScreen.BedChallenge(
-                                            RoutineTask(
-                                                id = "bed_quick",
-                                                title = "مرتب کردن فوری تخت خواب",
-                                                type = "bed_inspection",
-                                                strictLockEnabled = true
-                                            )
+                    var showHandleBanner by remember { mutableStateOf(true) }
+                    Column(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(paddingValues)
+                    ) {
+                        if (showHandleBanner && currentProfile.handle.isNotBlank()) {
+                            val isPhoneHandle = currentProfile.handle.startsWith("@09") || currentProfile.handle.startsWith("@+98") || currentProfile.handle.startsWith("@98")
+                            Card(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 14.dp, vertical = 6.dp),
+                                colors = CardDefaults.cardColors(
+                                    containerColor = if (isPhoneHandle) Color(0xFF1B2438) else Color(0xFF142233)
+                                ),
+                                shape = RoundedCornerShape(12.dp),
+                                border = androidx.compose.foundation.BorderStroke(1.dp, NeonCyan.copy(alpha = 0.4f))
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Campaign,
+                                        contentDescription = null,
+                                        tint = NeonCyan,
+                                        modifier = Modifier.size(20.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        Text(
+                                            text = "شناسه شما در اراده: ${currentProfile.handle}",
+                                            color = NeonCyan,
+                                            fontWeight = FontWeight.Bold,
+                                            fontSize = 12.sp
                                         )
-                                    },
-                                    onOpenVoiceChallenge = {
-                                        currentScreen = ActiveScreen.VoiceChallenge(
-                                            RoutineTask(
-                                                id = "wake_quick",
-                                                title = "چالش زنگ صبحگاهی و ویس انگیزشی",
-                                                type = "wake_voice",
-                                                strictLockEnabled = true
+                                        if (isPhoneHandle) {
+                                            Text(
+                                                text = "جهت حفظ حریم خصوصی شماره تماس، می‌توانید در تب «پروفایل» آیدی دلخواه ثبت کنید.",
+                                                color = TextMuted,
+                                                fontSize = 10.sp
                                             )
+                                        }
+                                    }
+                                    IconButton(
+                                        onClick = { showHandleBanner = false },
+                                        modifier = Modifier.size(24.dp)
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.Close,
+                                            contentDescription = "بستن",
+                                            tint = TextMuted,
+                                            modifier = Modifier.size(16.dp)
                                         )
                                     }
-                                )
+                                }
                             }
-                            MainTab.FOCUS -> {
-                                FocusScreen(
-                                    userProfile = currentProfile,
-                                    repository = repository
-                                )
-                            }
-                            MainTab.NOTES -> {
-                                NotesScreen(viewModel = notesViewModel)
-                            }
-                            MainTab.PROFILE -> {
-                                ProfileScreen(
-                                    profile = currentProfile,
-                                    isAdmin = isAdmin,
-                                    onOpenAdminPanel = { currentScreen = ActiveScreen.AdminPanel },
-                                    onSignOut = { authViewModel.signOut(context) }
-                                )
+                        }
+
+                        Box(modifier = Modifier.weight(1f)) {
+                            when (screen.tab) {
+                                MainTab.DASHBOARD -> {
+                                    DashboardScreen(
+                                        currentUserId = currentUserId,
+                                        viewModel = dashboardViewModel,
+                                        aiManager = aiManager,
+                                        onNavigateToBedChallenge = { task ->
+                                            currentScreen = ActiveScreen.BedChallenge(task)
+                                        },
+                                        onNavigateToVoiceChallenge = { task ->
+                                            currentScreen = ActiveScreen.VoiceChallenge(task)
+                                        }
+                                    )
+                                }
+                                MainTab.CHALLENGES -> {
+                                    ChallengesHubScreen(
+                                        onOpenBedChallenge = {
+                                            currentScreen = ActiveScreen.BedChallenge(
+                                                RoutineTask(
+                                                    id = "bed_quick",
+                                                    title = "مرتب کردن فوری تخت خواب",
+                                                    type = "bed_inspection",
+                                                    strictLockEnabled = true
+                                                )
+                                            )
+                                        },
+                                        onOpenVoiceChallenge = {
+                                            currentScreen = ActiveScreen.VoiceChallenge(
+                                                RoutineTask(
+                                                    id = "wake_quick",
+                                                    title = "چالش زنگ صبحگاهی و ویس انگیزشی",
+                                                    type = "wake_voice",
+                                                    strictLockEnabled = true
+                                                )
+                                            )
+                                        }
+                                    )
+                                }
+                                MainTab.COMMUNITY -> {
+                                    CommunityScreen(
+                                        currentProfile = currentProfile,
+                                        repository = repository
+                                    )
+                                }
+                                MainTab.FOCUS -> {
+                                    FocusScreen(
+                                        userProfile = currentProfile,
+                                        repository = repository
+                                    )
+                                }
+                                MainTab.PROFILE -> {
+                                    ProfileScreen(
+                                        profile = currentProfile,
+                                        isAdmin = isAdmin,
+                                        repository = repository,
+                                        onOpenAdminPanel = { currentScreen = ActiveScreen.AdminPanel },
+                                        onSignOut = { authViewModel.signOut(context) }
+                                    )
+                                }
                             }
                         }
                     }
@@ -483,6 +556,7 @@ fun ChallengesHubScreen(
 fun ProfileScreen(
     profile: UserProfile,
     isAdmin: Boolean = false,
+    repository: FirestoreRepository? = null,
     onOpenAdminPanel: () -> Unit = {},
     onSignOut: () -> Unit
 ) {
@@ -493,6 +567,11 @@ fun ProfileScreen(
             (diff / (1000 * 60 * 60 * 24)).coerceAtLeast(0)
         } else 14L
     }
+
+    var showEditHandleDialog by remember { mutableStateOf(false) }
+    var enteredHandleInput by remember(profile.handle) { mutableStateOf(profile.handle.removePrefix("@")) }
+    var handleErrorMessage by remember { mutableStateOf<String?>(null) }
+    val coroutineScope = rememberCoroutineScope()
 
     Column(
         modifier = Modifier
@@ -619,14 +698,53 @@ fun ProfileScreen(
                     }
                     Spacer(modifier = Modifier.width(14.dp))
                     Column {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text(
+                                text = profile.displayName.ifBlank { "کاربر اراده" },
+                                style = MaterialTheme.typography.titleLarge,
+                                color = TextPrimary,
+                                fontWeight = FontWeight.Bold
+                            )
+                            if (profile.isVerified) {
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Icon(
+                                    imageVector = Icons.Default.Verified,
+                                    contentDescription = "حساب تایید شده",
+                                    tint = NeonCyan,
+                                    modifier = Modifier.size(20.dp)
+                                )
+                            }
+                        }
+                        if (profile.handle.isNotBlank()) {
+                            Spacer(modifier = Modifier.height(2.dp))
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(6.dp))
+                                    .background(Color(0xFF1E2638))
+                                    .clickable {
+                                        enteredHandleInput = profile.handle.removePrefix("@")
+                                        showEditHandleDialog = true
+                                    }
+                                    .padding(horizontal = 6.dp, vertical = 2.dp)
+                            ) {
+                                Text(
+                                    text = profile.handle,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = NeonCyan,
+                                    fontWeight = FontWeight.Bold
+                                )
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Icon(
+                                    imageVector = Icons.Default.Edit,
+                                    contentDescription = "ویرایش آیدی",
+                                    tint = TextMuted,
+                                    modifier = Modifier.size(12.dp)
+                                )
+                            }
+                        }
                         Text(
-                            text = profile.displayName.ifBlank { "کاربر اراده" },
-                            style = MaterialTheme.typography.titleLarge,
-                            color = TextPrimary,
-                            fontWeight = FontWeight.Bold
-                        )
-                        Text(
-                            text = profile.email.ifBlank { "ثبت‌نام شده با حساب گوگل" },
+                            text = profile.email.ifBlank { "ثبت‌نام شده با حساب اراده" },
                             style = MaterialTheme.typography.bodySmall,
                             color = TextMuted
                         )
@@ -810,7 +928,7 @@ fun ProfileScreen(
                         )
                         Spacer(modifier = Modifier.height(6.dp))
                         Text(
-                            text = "جهت ورود به پنل مدیریت، رمز مستر ۴ رقمی (PIN: 0991) را وارد کنید:",
+                            text = "جهت ورود به پنل مدیریت، رمز مستر امنیتی ۴ رقمی مدیر اراده را وارد کنید:",
                             color = TextSecondary,
                             style = MaterialTheme.typography.bodySmall
                         )
@@ -850,13 +968,16 @@ fun ProfileScreen(
                     Button(
                         onClick = {
                             val clean = profile.email.trim().lowercase()
-                            if (clean == "hrhrhrhr0991@gmail.com" && enteredAdminPin.trim() == "0991") {
+                            val isAuthorized = clean == "hrhrhrhr0991@gmail.com" ||
+                                    profile.role == "super_admin" ||
+                                    profile.userId == "usr_hrhrhrhr0991_gmail_com"
+                            if (isAuthorized && enteredAdminPin.trim() == "0991") {
                                 showAdminPinDialog = false
                                 enteredAdminPin = ""
                                 adminPinError = null
                                 onOpenAdminPanel()
-                            } else if (clean != "hrhrhrhr0991@gmail.com") {
-                                adminPinError = "تنها حساب hrhrhrhr0991@gmail.com مجاز به ورود به پنل مدیریت است."
+                            } else if (!isAuthorized) {
+                                adminPinError = "تنها حساب مدیر کل مجاز به ورود به پنل مدیریت است."
                             } else {
                                 adminPinError = "رمز عبور اشتباه است! دسترسی غیرمجاز."
                             }
@@ -875,6 +996,90 @@ fun ProfileScreen(
                             adminPinError = null
                         }
                     ) {
+                        Text("انصراف", color = TextSecondary)
+                    }
+                },
+                containerColor = DarkSurface,
+                shape = RoundedCornerShape(16.dp)
+            )
+        }
+
+        if (showEditHandleDialog) {
+            AlertDialog(
+                onDismissRequest = {
+                    showEditHandleDialog = false
+                    handleErrorMessage = null
+                },
+                title = {
+                    Text(
+                        text = "تنظیم شناسه کاربری (آیدی دلخواه)",
+                        color = NeonCyan,
+                        fontWeight = FontWeight.Bold
+                    )
+                },
+                text = {
+                    Column {
+                        Text(
+                            text = "با ثبت آیدی دلخواه، شماره تماس شما در بخش گفت‌وگو و جستجو مخفی خواهد ماند.",
+                            color = TextSecondary,
+                            style = MaterialTheme.typography.bodySmall
+                        )
+                        Spacer(modifier = Modifier.height(12.dp))
+                        OutlinedTextField(
+                            value = enteredHandleInput,
+                            onValueChange = {
+                                enteredHandleInput = it.filter { ch -> ch.isLetterOrDigit() || ch == '_' }
+                                handleErrorMessage = null
+                            },
+                            label = { Text("آیدی (بدون فاصله)") },
+                            prefix = { Text("@", color = NeonCyan) },
+                            singleLine = true,
+                            modifier = Modifier.fillMaxWidth().testTag("edit_handle_input"),
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedBorderColor = NeonCyan,
+                                unfocusedBorderColor = Color(0xFF26324A),
+                                focusedTextColor = TextPrimary,
+                                unfocusedTextColor = TextPrimary
+                            ),
+                            isError = handleErrorMessage != null
+                        )
+                        if (handleErrorMessage != null) {
+                            Spacer(modifier = Modifier.height(6.dp))
+                            Text(
+                                text = handleErrorMessage.orEmpty(),
+                                color = Color(0xFFFF5252),
+                                style = MaterialTheme.typography.labelSmall
+                            )
+                        }
+                    }
+                },
+                confirmButton = {
+                    Button(
+                        onClick = {
+                            val cleanInput = enteredHandleInput.trim()
+                            if (cleanInput.length < 3) {
+                                handleErrorMessage = "آیدی باید حداقل ۳ کاراکتر باشد."
+                            } else {
+                                val fullHandle = "@$cleanInput"
+                                coroutineScope.launch {
+                                    val res = repository?.updateUserHandle(profile.userId, fullHandle)
+                                    if (res == true) {
+                                        showEditHandleDialog = false
+                                        handleErrorMessage = null
+                                    } else {
+                                        handleErrorMessage = "خطا در برقراری ارتباط. مجدد تلاش کنید."
+                                    }
+                                }
+                            }
+                        },
+                        colors = ButtonDefaults.buttonColors(containerColor = NeonCyan, contentColor = DarkBackground),
+                        modifier = Modifier.testTag("save_handle_btn")
+                    ) {
+                        Text("ذخیره آیدی", fontWeight = FontWeight.Bold)
+                    }
+                },
+                dismissButton = {
+                    TextButton(onClick = { showEditHandleDialog = false }) {
                         Text("انصراف", color = TextSecondary)
                     }
                 },

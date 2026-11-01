@@ -57,6 +57,10 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
+import androidx.compose.material.icons.filled.DeleteForever
+import androidx.compose.material.icons.filled.Verified
+import androidx.compose.material3.Checkbox
+import androidx.compose.material3.CheckboxDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -68,6 +72,7 @@ import androidx.compose.material3.TabRow
 import androidx.compose.material3.TabRowDefaults
 import androidx.compose.material3.TabRowDefaults.tabIndicatorOffset
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.collectAsState
@@ -210,6 +215,7 @@ fun AdminPanelScreen(
 
     // Dialog state handlers
     var showAddUserDialog by remember { mutableStateOf(false) }
+    var showCleanUsersConfirmDialog by remember { mutableStateOf(false) }
     var selectedUserForBadges by remember { mutableStateOf<UserProfile?>(null) }
     var selectedUserForRole by remember { mutableStateOf<UserProfile?>(null) }
     var selectedUserForNote by remember { mutableStateOf<UserProfile?>(null) }
@@ -467,6 +473,18 @@ fun AdminPanelScreen(
                             Spacer(modifier = Modifier.width(4.dp))
                             Text("+ کاربر", fontWeight = FontWeight.Bold, fontSize = 12.sp)
                         }
+
+                        // Clean All Test Users Button
+                        Button(
+                            onClick = { showCleanUsersConfirmDialog = true },
+                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF4A1520), contentColor = Color(0xFFFF5252)),
+                            shape = RoundedCornerShape(12.dp),
+                            modifier = Modifier.height(54.dp)
+                        ) {
+                            Icon(Icons.Default.DeleteForever, contentDescription = null, modifier = Modifier.size(16.dp))
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text("پاکسازی", fontWeight = FontWeight.Bold, fontSize = 11.sp)
+                        }
                     }
 
                     Spacer(modifier = Modifier.height(10.dp))
@@ -489,7 +507,14 @@ fun AdminPanelScreen(
                                 onOpenBadges = { selectedUserForBadges = user },
                                 onOpenRole = { selectedUserForRole = user },
                                 onOpenNote = { selectedUserForNote = user },
-                                onOpenAdjust = { selectedUserForAdjust = user }
+                                onOpenAdjust = { selectedUserForAdjust = user },
+                                onToggleVerified = {
+                                    scope.launch {
+                                        val nextVerified = !user.isVerified
+                                        repository.toggleUserVerified(user.userId, nextVerified)
+                                        Toast.makeText(context, if (nextVerified) "تیک آبی فعال شد 💎" else "تیک آبی غیرفعال شد", Toast.LENGTH_SHORT).show()
+                                    }
+                                }
                             )
                         }
                     }
@@ -497,14 +522,64 @@ fun AdminPanelScreen(
             }
         }
 
-        // DIALOG 1: ADD NEW USER (هواساز کاربر با سطح دسترسی دلخواه)
+        // CONFIRMATION DIALOG: CLEAN ALL TEST USERS
+        if (showCleanUsersConfirmDialog) {
+            AlertDialog(
+                onDismissRequest = { showCleanUsersConfirmDialog = false },
+                containerColor = DarkSurface,
+                title = {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Icons.Default.DeleteForever, contentDescription = null, tint = Color(0xFFFF5252))
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("پاکسازی و حذف کاربران تستی ⚠️", color = Color(0xFFFF5252), fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                    }
+                },
+                text = {
+                    Text(
+                        "آیا از پاکسازی تمام کاربران تستی اطمینان دارید؟ منحصراً حساب مدیر کل ارشد (hrhrhrhr0991@gmail.com) در دیتابیس باقی می‌ماند و تمامی رکوردهای دیگر حذف می‌شوند.",
+                        color = TextPrimary,
+                        fontSize = 13.sp
+                    )
+                },
+                confirmButton = {
+                    Button(
+                        onClick = {
+                            scope.launch {
+                                val count = repository.cleanUpAllNonAdminUsers()
+                                showCleanUsersConfirmDialog = false
+                                Toast.makeText(context, "$count کاربر تستی با موفقیت حذف شدند و فقط حساب مدیر باقی ماند 🛡️", Toast.LENGTH_LONG).show()
+                            }
+                        },
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFF5252), contentColor = Color.White)
+                    ) {
+                        Text("بله، پاکسازی کن", fontWeight = FontWeight.Bold)
+                    }
+                },
+                dismissButton = {
+                    TextButton(onClick = { showCleanUsersConfirmDialog = false }) {
+                        Text("انصراف", color = TextMuted)
+                    }
+                }
+            )
+        }
+
+        // DIALOG 1: ADD NEW USER (هواساز کاربر با سطح دسترسی دلخواه و اعطای مدال)
         if (showAddUserDialog) {
             AddUserDialog(
                 onDismiss = { showAddUserDialog = false },
-                onCreate = { name, email, phone, role, days ->
+                onCreate = { name, email, phone, role, days, badges, isVerified, handle ->
                     scope.launch {
                         try {
-                            repository.adminCreateUser(name, email, phone, role, days)
+                            repository.adminCreateUser(
+                                displayName = name,
+                                email = email,
+                                phone = phone,
+                                role = role,
+                                durationDays = days,
+                                unlockedBadges = badges,
+                                isVerified = isVerified,
+                                customHandle = handle
+                            )
                             showAddUserDialog = false
                             Toast.makeText(context, "کاربر $name با سطح $role با موفقیت ایجاد شد ✅", Toast.LENGTH_LONG).show()
                         } catch (e: Exception) {
@@ -698,7 +773,8 @@ fun AdminUserCard(
     onOpenBadges: () -> Unit,
     onOpenRole: () -> Unit,
     onOpenNote: () -> Unit,
-    onOpenAdjust: () -> Unit
+    onOpenAdjust: () -> Unit,
+    onToggleVerified: () -> Unit
 ) {
     val daysRemaining = remember(user) {
         val end = user.trialEndDate?.toDate()
@@ -733,6 +809,10 @@ fun AdminUserCard(
                             color = TextPrimary,
                             fontWeight = FontWeight.Bold
                         )
+                        if (user.isVerified) {
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Icon(Icons.Default.Verified, contentDescription = "تیک آبی رسمی", tint = NeonCyan, modifier = Modifier.size(16.dp))
+                        }
                         if (user.isBanned) {
                             Spacer(modifier = Modifier.width(6.dp))
                             Box(
@@ -745,29 +825,54 @@ fun AdminUserCard(
                             }
                         }
                     }
-                    Text(
-                        text = user.email.ifBlank { "بدون ایمیل" },
-                        style = MaterialTheme.typography.bodySmall,
-                        color = TextMuted,
-                        fontSize = 11.sp
-                    )
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            text = user.handle.ifBlank { "@user" },
+                            style = MaterialTheme.typography.bodySmall,
+                            color = NeonEmerald,
+                            fontSize = 11.sp
+                        )
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(
+                            text = user.email.ifBlank { "بدون ایمیل" },
+                            style = MaterialTheme.typography.bodySmall,
+                            color = TextMuted,
+                            fontSize = 11.sp
+                        )
+                    }
                 }
 
-                // Role Badge
-                Box(
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(8.dp))
-                        .background(roleColor.copy(alpha = 0.15f))
-                        .border(1.dp, roleColor.copy(alpha = 0.6f), RoundedCornerShape(8.dp))
-                        .padding(horizontal = 8.dp, vertical = 4.dp)
-                ) {
-                    Text(
-                        text = roleTitle,
-                        style = MaterialTheme.typography.labelSmall,
-                        color = roleColor,
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 11.sp
-                    )
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    IconButton(
+                        onClick = onToggleVerified,
+                        modifier = Modifier.size(32.dp)
+                    ) {
+                        Icon(
+                            imageVector = if (user.isVerified) Icons.Default.Verified else Icons.Default.CheckCircle,
+                            contentDescription = "تغییر وضعیت تیک آبی",
+                            tint = if (user.isVerified) NeonCyan else TextMuted,
+                            modifier = Modifier.size(20.dp)
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.width(4.dp))
+
+                    // Role Badge
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(8.dp))
+                            .background(roleColor.copy(alpha = 0.15f))
+                            .border(1.dp, roleColor.copy(alpha = 0.6f), RoundedCornerShape(8.dp))
+                            .padding(horizontal = 8.dp, vertical = 4.dp)
+                    ) {
+                        Text(
+                            text = roleTitle,
+                            style = MaterialTheme.typography.labelSmall,
+                            color = roleColor,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 11.sp
+                        )
+                    }
                 }
             }
 
@@ -873,13 +978,16 @@ fun AdminUserCard(
 @Composable
 fun AddUserDialog(
     onDismiss: () -> Unit,
-    onCreate: (name: String, email: String, phone: String, role: String, durationDays: Long) -> Unit
+    onCreate: (name: String, email: String, phone: String, role: String, durationDays: Long, badges: List<String>, isVerified: Boolean, handle: String) -> Unit
 ) {
     var name by remember { mutableStateOf("") }
     var email by remember { mutableStateOf("") }
     var phone by remember { mutableStateOf("") }
+    var customHandle by remember { mutableStateOf("") }
     var selectedRole by remember { mutableStateOf("user") }
     var selectedDays by remember { mutableStateOf(30L) }
+    var isVerified by remember { mutableStateOf(false) }
+    var selectedBadges by remember { mutableStateOf(setOf<String>()) }
 
     val roles = listOf(
         "user" to "کاربر عادی",
@@ -913,14 +1021,6 @@ fun AddUserDialog(
                     singleLine = true
                 )
                 OutlinedTextField(
-                    value = email,
-                    onValueChange = { email = it },
-                    label = { Text("آدرس ایمیل") },
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
-                    modifier = Modifier.fillMaxWidth(),
-                    singleLine = true
-                )
-                OutlinedTextField(
                     value = phone,
                     onValueChange = { phone = it },
                     label = { Text("شماره تماس") },
@@ -928,6 +1028,44 @@ fun AddUserDialog(
                     modifier = Modifier.fillMaxWidth(),
                     singleLine = true
                 )
+                OutlinedTextField(
+                    value = email,
+                    onValueChange = { email = it },
+                    label = { Text("آدرس ایمیل (اختیاری)") },
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true
+                )
+                OutlinedTextField(
+                    value = customHandle,
+                    onValueChange = { customHandle = it },
+                    label = { Text("شناسه کاربری دلخواه (مثلاً @ali)") },
+                    placeholder = { Text("@username") },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true
+                )
+
+                // Verified Blue Badge Toggle
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(8.dp))
+                        .background(DarkSurfaceVariant)
+                        .padding(horizontal = 10.dp, vertical = 6.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Icons.Default.Verified, contentDescription = null, tint = NeonCyan, modifier = Modifier.size(18.dp))
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text("اعطای تیک آبی رسمی 💎", color = TextPrimary, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                    }
+                    Checkbox(
+                        checked = isVerified,
+                        onCheckedChange = { isVerified = it },
+                        colors = CheckboxDefaults.colors(checkedColor = NeonCyan)
+                    )
+                }
 
                 Text("سطح دسترسی و نقش:", style = MaterialTheme.typography.labelSmall, color = TextSecondary)
                 Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
@@ -958,13 +1096,50 @@ fun AddUserDialog(
                         )
                     }
                 }
+
+                Text("اعطای مدال‌های افتخار به کاربر:", style = MaterialTheme.typography.labelSmall, color = NeonAmber, fontWeight = FontWeight.Bold)
+                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    ALL_BADGES_DEFINITIONS.forEach { badge ->
+                        val isChecked = selectedBadges.contains(badge.id)
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(8.dp))
+                                .background(if (isChecked) NeonAmber.copy(alpha = 0.15f) else Color.Transparent)
+                                .clickable {
+                                    selectedBadges = if (isChecked) selectedBadges - badge.id else selectedBadges + badge.id
+                                }
+                                .padding(horizontal = 8.dp, vertical = 4.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Checkbox(
+                                checked = isChecked,
+                                onCheckedChange = { checked ->
+                                    selectedBadges = if (checked) selectedBadges + badge.id else selectedBadges - badge.id
+                                },
+                                colors = CheckboxDefaults.colors(checkedColor = NeonAmber)
+                            )
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text(badge.iconEmoji + " " + badge.title, color = TextPrimary, fontSize = 11.sp)
+                        }
+                    }
+                }
             }
         },
         confirmButton = {
             Button(
                 onClick = {
-                    if (name.isBlank() || email.isBlank()) return@Button
-                    onCreate(name.trim(), email.trim(), phone.trim(), selectedRole, selectedDays)
+                    if (name.isBlank() && phone.isBlank()) return@Button
+                    onCreate(
+                        name.trim(),
+                        email.trim(),
+                        phone.trim(),
+                        selectedRole,
+                        selectedDays,
+                        selectedBadges.toList(),
+                        isVerified,
+                        customHandle.trim()
+                    )
                 },
                 colors = ButtonDefaults.buttonColors(containerColor = NeonEmerald, contentColor = DarkBackground)
             ) {

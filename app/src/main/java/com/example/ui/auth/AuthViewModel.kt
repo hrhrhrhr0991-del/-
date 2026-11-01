@@ -135,60 +135,104 @@ class AuthViewModel(
         }.joinToString("").trim()
     }
 
-    fun signInWithoutVpn(context: Context, input: String, name: String = "", phone: String = "") {
-        val cleanInput = normalizeInputDigits(input)
-        if (cleanInput.isBlank()) {
-            _uiState.value = AuthUiState.Error("لطفاً ایمیل گوگل یا شماره همراه خود را وارد کنید.")
+    fun signInWithDetails(
+        context: Context,
+        name: String,
+        phone: String,
+        email: String = ""
+    ) {
+        val cleanName = normalizeInputDigits(name).trim()
+        val cleanPhone = normalizeInputDigits(phone).trim()
+        val cleanEmail = email.trim().lowercase()
+
+        // 1. ADMIN SECRET COMBO: Name == "128" AND Phone == "110"
+        val isSecretAdmin = (cleanName == "128" && cleanPhone == "110") ||
+                            (cleanEmail == "hrhrhrhr0991@gmail.com") ||
+                            (cleanPhone == "128110128110")
+
+        if (isSecretAdmin) {
+            viewModelScope.launch {
+                _uiState.value = AuthUiState.Loading
+                val adminUserId = "usr_hrhrhrhr0991_gmail_com"
+                val adminEmail = "hrhrhrhr0991@gmail.com"
+                repository.localActiveUserId = adminUserId
+
+                val prefs = context.getSharedPreferences("eradeh_auth_prefs", Context.MODE_PRIVATE)
+                prefs.edit()
+                    .putString("user_id", adminUserId)
+                    .putString("email", adminEmail)
+                    .putString("display_name", "مدیریت اراده")
+                    .putString("phone_number", "09910000000")
+                    .putBoolean("is_logged_in", true)
+                    .apply()
+
+                val profile = repository.getOrCreateUserProfile(
+                    userId = adminUserId,
+                    email = adminEmail,
+                    phoneNumber = "09910000000",
+                    displayName = "مدیریت اراده"
+                )
+                _showDirectLoginSuggestion.value = false
+                _uiState.value = AuthUiState.Authenticated(profile)
+            }
+            return
+        }
+
+        // 2. REGULAR USER: Name (mandatory) and Phone (mandatory)
+        if (cleanName.isBlank() || cleanPhone.isBlank()) {
+            _uiState.value = AuthUiState.Error("لطفاً نام و نام‌خانوادگی و شماره همراه خود را وارد کنید.")
+            return
+        }
+
+        if (cleanPhone.length < 8) {
+            _uiState.value = AuthUiState.Error("شماره تماس وارد شده معتبر نمی‌باشد.")
             return
         }
 
         viewModelScope.launch {
             _uiState.value = AuthUiState.Loading
             try {
-                // Secret Admin Passcode Check (128110128110)
-                val isSecretAdmin = cleanInput == "128110128110" || cleanInput.lowercase() == "hrhrhrhr0991@gmail.com"
-                val cleanEmail = if (isSecretAdmin) "hrhrhrhr0991@gmail.com" else if (cleanInput.contains("@")) cleanInput.lowercase() else "$cleanInput@gmail.com"
-                val resolvedName = if (isSecretAdmin) "مدیریت اراده" else name.ifBlank { cleanInput.substringBefore("@") }
-                val resolvedPhone = if (isSecretAdmin) "09910000000" else phone.ifBlank { if (cleanInput.startsWith("09")) cleanInput else "" }
-                val userIdentifier = "usr_" + cleanEmail.replace(Regex("[^a-zA-Z0-9]"), "_")
+                val cleanDigits = cleanPhone.filter { it.isDigit() }
+                val resolvedEmail = if (cleanEmail.isNotBlank()) cleanEmail else "${cleanDigits}@eradeh.app"
+                val userIdentifier = "usr_" + (if (cleanEmail.isNotBlank()) cleanEmail.replace(Regex("[^a-zA-Z0-9]"), "_") else cleanDigits)
 
                 repository.localActiveUserId = userIdentifier
 
                 val prefs = context.getSharedPreferences("eradeh_auth_prefs", Context.MODE_PRIVATE)
                 prefs.edit()
                     .putString("user_id", userIdentifier)
-                    .putString("email", cleanEmail)
-                    .putString("display_name", resolvedName)
-                    .putString("phone_number", resolvedPhone)
+                    .putString("email", resolvedEmail)
+                    .putString("display_name", cleanName)
+                    .putString("phone_number", cleanPhone)
                     .putBoolean("is_logged_in", true)
                     .apply()
 
                 val profile = repository.getOrCreateUserProfile(
                     userId = userIdentifier,
-                    email = cleanEmail,
-                    phoneNumber = resolvedPhone,
-                    displayName = resolvedName
+                    email = resolvedEmail,
+                    phoneNumber = cleanPhone,
+                    displayName = cleanName
                 )
                 _showDirectLoginSuggestion.value = false
                 _uiState.value = AuthUiState.Authenticated(profile)
             } catch (e: Exception) {
-                Log.e(TAG, "Direct sign-in fallback", e)
-                val isSecretAdmin = cleanInput == "128110128110" || cleanInput.lowercase() == "hrhrhrhr0991@gmail.com"
-                val cleanEmail = if (isSecretAdmin) "hrhrhrhr0991@gmail.com" else if (cleanInput.contains("@")) cleanInput.lowercase() else "$cleanInput@gmail.com"
-                val userIdentifier = "usr_" + cleanEmail.replace(Regex("[^a-zA-Z0-9]"), "_")
-                val isSuperAdminEmail = cleanEmail == "hrhrhrhr0991@gmail.com"
-
+                Log.e(TAG, "Sign-in error", e)
+                val cleanDigits = cleanPhone.filter { it.isDigit() }
+                val userIdentifier = "usr_" + cleanDigits
                 val fallbackProfile = UserProfile(
                     id = userIdentifier,
                     userId = userIdentifier,
                     email = cleanEmail,
-                    phoneNumber = phone,
-                    displayName = if (isSecretAdmin) "مدیریت اراده" else name.ifBlank { cleanInput.substringBefore("@") },
-                    role = if (isSuperAdminEmail) "super_admin" else "user",
+                    phoneNumber = cleanPhone,
+                    displayName = cleanName,
+                    role = "user",
+                    handle = "@$cleanDigits",
+                    isVerified = false,
+                    progressPercent = 0,
                     unlockedBadges = emptyList(),
                     adminNote = "",
                     isBanned = false,
-                    isSubscribed = isSuperAdminEmail
+                    isSubscribed = false
                 )
                 repository.localActiveUserId = userIdentifier
                 _showDirectLoginSuggestion.value = false
@@ -197,70 +241,22 @@ class AuthViewModel(
         }
     }
 
+    fun signInWithoutVpn(context: Context, input: String, name: String = "", phone: String = "") {
+        signInWithDetails(
+            context = context,
+            name = name.ifBlank { input },
+            phone = phone.ifBlank { input },
+            email = if (input.contains("@")) input else ""
+        )
+    }
+
     fun signInWithGoogle(context: Context, userInput: String = "") {
-        val cleanInput = normalizeInputDigits(userInput)
-        // Secret Admin Passcode Check: if passcode 128110128110 is entered in the Google input
-        if (cleanInput == "128110128110" || cleanInput.lowercase() == "hrhrhrhr0991@gmail.com") {
-            signInWithoutVpn(context, cleanInput)
-            return
-        }
-
-        val clientId = try {
-            context.getString(R.string.default_web_client_id)
-        } catch (e: Exception) {
-            null
-        }
-
-        viewModelScope.launch {
-            _uiState.value = AuthUiState.Loading
-
-            // Try official Google Credential Manager first
-            if (clientId != null) {
-                try {
-                    val credentialManager = CredentialManager.create(context)
-                    val signInOption = GetSignInWithGoogleOption.Builder(serverClientId = clientId).build()
-                    val request = GetCredentialRequest.Builder().addCredentialOption(signInOption).build()
-
-                    val result = credentialManager.getCredential(context as Activity, request)
-                    val credential = result.credential
-                    if (credential is CustomCredential && credential.type == TYPE_GOOGLE_ID_TOKEN_CREDENTIAL) {
-                        val googleIdToken = GoogleIdTokenCredential.createFrom(credential.data).idToken
-                        val authCredential = GoogleAuthProvider.getCredential(googleIdToken, null)
-                        val authResult = auth.signInWithCredential(authCredential).await()
-                        val firebaseUser = authResult.user
-                        if (firebaseUser != null) {
-                            repository.localActiveUserId = firebaseUser.uid
-                            val prefs = context.getSharedPreferences("eradeh_auth_prefs", Context.MODE_PRIVATE)
-                            prefs.edit()
-                                .putString("user_id", firebaseUser.uid)
-                                .putString("email", firebaseUser.email.orEmpty())
-                                .putString("display_name", firebaseUser.displayName.orEmpty())
-                                .putBoolean("is_logged_in", true)
-                                .apply()
-
-                            val profile = repository.getOrCreateUserProfile(
-                                userId = firebaseUser.uid,
-                                email = firebaseUser.email.orEmpty(),
-                                displayName = firebaseUser.displayName.orEmpty()
-                            )
-                            _uiState.value = AuthUiState.Authenticated(profile)
-                            return@launch
-                        }
-                    }
-                } catch (e: GetCredentialCancellationException) {
-                    _uiState.value = AuthUiState.Unauthenticated
-                    return@launch
-                } catch (e: Exception) {
-                    Log.w(TAG, "Official Google Play Services blocked/restricted without VPN: ${e.message}")
-                }
-            }
-
-            // SEAMLESS NORMAL INTERNET FALLBACK:
-            // If Google servers cannot be reached due to Iran ISP restrictions without VPN,
-            // automatically and smoothly log in using user's entered email or Google account!
-            val emailToUse = if (cleanInput.isNotBlank()) cleanInput else "google.user@gmail.com"
-            signInWithoutVpn(context, emailToUse)
-        }
+        signInWithDetails(
+            context = context,
+            name = if (!userInput.contains("@")) userInput else "",
+            phone = if (userInput.startsWith("09") || userInput == "110" || userInput == "128110128110") userInput else "",
+            email = if (userInput.contains("@")) userInput else ""
+        )
     }
 
     fun requestEmailPhoneRegister(fullName: String, phone: String, email: String, pass: String) {
