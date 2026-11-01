@@ -94,7 +94,8 @@ class DashboardViewModel(
         }
     }
 
-    private val _waterGlasses = MutableStateFlow(4)
+    // Default water intake starts at 0 (صفر صفر) until user records glasses
+    private val _waterGlasses = MutableStateFlow(0)
     val waterGlasses: StateFlow<Int> = _waterGlasses.asStateFlow()
 
     fun setWaterGlasses(count: Int) {

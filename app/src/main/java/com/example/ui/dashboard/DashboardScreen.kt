@@ -17,7 +17,10 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
@@ -29,6 +32,8 @@ import androidx.compose.material.icons.filled.Alarm
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.BarChart
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.TrendingUp
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Fireplace
 import androidx.compose.material.icons.filled.HourglassBottom
@@ -84,6 +89,7 @@ import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextDecoration
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -748,14 +754,26 @@ fun DashboardScreen(
                                         )
                                         Spacer(modifier = Modifier.height(16.dp))
                                         Button(
-                                            onClick = { viewModel.seedGoldenInternationalRoutines() },
-                                            colors = ButtonDefaults.buttonColors(containerColor = NeonAmber, contentColor = DarkBackground),
+                                            onClick = { showAddDialog = true },
+                                            colors = ButtonDefaults.buttonColors(containerColor = NeonCyan, contentColor = DarkBackground),
                                             shape = RoundedCornerShape(12.dp),
-                                            modifier = Modifier.testTag("empty_state_seed_btn")
+                                            modifier = Modifier.fillMaxWidth().testTag("empty_state_add_btn")
                                         ) {
-                                            Icon(Icons.Default.AutoAwesome, contentDescription = null)
+                                            Icon(Icons.Default.Add, contentDescription = null)
                                             Spacer(modifier = Modifier.width(8.dp))
-                                            Text(if (isEnglish) "Activate Golden Routines" else "فعال‌سازی ۶ روتین هوشمند طلایی", fontWeight = FontWeight.Bold)
+                                            Text(if (isEnglish) "+ Add Routine / Trending Challenges" else "+ ثبت چالش جدید (ترند یا دستی)", fontWeight = FontWeight.Bold)
+                                        }
+                                        Spacer(modifier = Modifier.height(8.dp))
+                                        OutlinedButton(
+                                            onClick = { viewModel.seedGoldenInternationalRoutines() },
+                                            shape = RoundedCornerShape(12.dp),
+                                            colors = ButtonDefaults.outlinedButtonColors(contentColor = NeonAmber),
+                                            border = BorderStroke(1.dp, NeonAmber.copy(alpha = 0.5f)),
+                                            modifier = Modifier.fillMaxWidth().testTag("empty_state_seed_btn")
+                                        ) {
+                                            Icon(Icons.Default.AutoAwesome, contentDescription = null, modifier = Modifier.size(16.dp))
+                                            Spacer(modifier = Modifier.width(6.dp))
+                                            Text(if (isEnglish) "Or Activate 6 Golden Routines" else "یا فعال‌سازی فوری ۶ روتین هوشمند طلایی", fontSize = 12.sp)
                                         }
                                     }
                                 }
@@ -1355,6 +1373,20 @@ fun RoutineTaskCard(
     }
 }
 
+data class TrendingChallengeItem(
+    val title: String,
+    val description: String,
+    val type: String,
+    val time: String,
+    val category: String,
+    val priority: String,
+    val repeatDays: String,
+    val isStrict: Boolean,
+    val badge: String,
+    val emoji: String,
+    val tagColor: Color
+)
+
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun AddRoutineDialog(
@@ -1383,6 +1415,89 @@ fun AddRoutineDialog(
     val priorities = listOf("high" to "الزامی 🔥", "medium" to "متوسط ⚡", "normal" to "عادی 🟢")
     val repeatOptions = listOf("هر روز", "روزهای کاری", "آخر هفته‌ها")
 
+    val trendingChallenges = remember {
+        listOf(
+            TrendingChallengeItem(
+                title = "مرتب کردن تخت خواب (چالش عکس هوش مصنوعی)",
+                description = "بررسی و تأیید هوشمند مرتب بودن رختخواب توسط بینایی ماشین جمینای",
+                type = "bed_inspection",
+                time = "07:00",
+                category = "صبحگاهی",
+                priority = "high",
+                repeatDays = "هر روز",
+                isStrict = true,
+                badge = "هوش مصنوعی Vision",
+                emoji = "🛏️",
+                tagColor = NeonCyan
+            ),
+            TrendingChallengeItem(
+                title = "بیداری صبحگاهی و چالش ویس انگیزشی اراده",
+                description = "تحلیل فرکانس صدا و کلمات اراده توسط هوش مصنوعی جهت شکستن رخوت صبحگاهی",
+                type = "wake_voice",
+                time = "07:15",
+                category = "صبحگاهی",
+                priority = "high",
+                repeatDays = "هر روز",
+                isStrict = true,
+                badge = "هوش مصنوعی Voice",
+                emoji = "🎙️",
+                tagColor = NeonAmber
+            ),
+            TrendingChallengeItem(
+                title = "نوشیدن ۲ لیوان آب ناشتا و کشش بدنی",
+                description = "آبرسانی اولیه بدن و سم‌زدایی جهت فعال‌سازی فوری جریان خون و هشیاری کامل",
+                type = "standard",
+                time = "07:30",
+                category = "سلامتی",
+                priority = "medium",
+                repeatDays = "هر روز",
+                isStrict = false,
+                badge = "آبرسانی فوری",
+                emoji = "💧",
+                tagColor = Color(0xFF38BDF8)
+            ),
+            TrendingChallengeItem(
+                title = "بلاک تمرکز عمیق سایبر (۴۵ دقیقه)",
+                description = "جلسه کار عمیق و پرچالش بدون چک کردن شبکه‌های اجتماعی و نوتیفیکیشن‌ها",
+                type = "standard",
+                time = "09:00",
+                category = "تمرکز و کار",
+                priority = "high",
+                repeatDays = "هر روز",
+                isStrict = true,
+                badge = "تمرکز پومودورو",
+                emoji = "⚡",
+                tagColor = Color(0xFFA855F7)
+            ),
+            TrendingChallengeItem(
+                title = "پروتکل تنفس جعبه‌ای ۴-۴-۴-۴ ریتمیک",
+                description = "تنفس جعبه‌ای جهت کاهش هورمون کورتیزول و اکسیژن‌رسانی بهینه به مغز",
+                type = "wake_voice",
+                time = "06:45",
+                category = "صبحگاهی",
+                priority = "medium",
+                repeatDays = "هر روز",
+                isStrict = false,
+                badge = "تنفس ریتمیک",
+                emoji = "🧘",
+                tagColor = NeonEmerald
+            ),
+            TrendingChallengeItem(
+                title = "بازتاب شبانه و ثبت شکرگزاری در دفترچه",
+                description = "مرور ۳ دستاورد روز و تخلیه ذهنی برای خواب باکیفیت و بازسازی بدن",
+                type = "standard",
+                time = "22:30",
+                category = "شبانگاهی",
+                priority = "high",
+                repeatDays = "هر روز",
+                isStrict = false,
+                badge = "شکرگزاری شب",
+                emoji = "📖",
+                tagColor = Color(0xFFF472B6)
+            )
+        )
+    }
+
     CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Rtl) {
         AlertDialog(
             onDismissRequest = onDismiss,
@@ -1401,6 +1516,145 @@ fun AddRoutineDialog(
                         .verticalScroll(rememberScrollState()),
                     verticalArrangement = Arrangement.spacedBy(14.dp)
                 ) {
+                    // Trending Challenges Quick Selection Section
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = CardDefaults.cardColors(containerColor = DarkBackground),
+                        shape = RoundedCornerShape(14.dp),
+                        border = BorderStroke(1.dp, NeonAmber.copy(alpha = 0.4f))
+                    ) {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(12.dp)
+                        ) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Icon(
+                                        Icons.Default.TrendingUp,
+                                        contentDescription = null,
+                                        tint = NeonAmber,
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Text(
+                                        text = "چالش‌های ترند و محبوب",
+                                        style = MaterialTheme.typography.titleSmall,
+                                        color = NeonAmber,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                }
+                                Text(
+                                    text = "لمس = انتخاب سریع",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = TextMuted,
+                                    fontSize = 10.sp
+                                )
+                            }
+
+                            Spacer(modifier = Modifier.height(6.dp))
+                            Text(
+                                text = "شامل ۲ چالش اصلی هوش مصنوعی و ریزعادت‌های اثبات‌شده روزانه:",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = TextSecondary,
+                                fontSize = 11.sp
+                            )
+
+                            Spacer(modifier = Modifier.height(10.dp))
+
+                            LazyRow(
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                contentPadding = PaddingValues(horizontal = 2.dp, vertical = 2.dp)
+                            ) {
+                                items(trendingChallenges) { challenge ->
+                                    val isSelected = title == challenge.title
+                                    Card(
+                                        modifier = Modifier
+                                            .width(210.dp)
+                                            .clip(RoundedCornerShape(12.dp))
+                                            .clickable {
+                                                title = challenge.title
+                                                description = challenge.description
+                                                time = challenge.time
+                                                selectedType = challenge.type
+                                                selectedCategory = challenge.category
+                                                selectedPriority = challenge.priority
+                                                selectedRepeat = challenge.repeatDays
+                                                isStrict = challenge.isStrict
+                                            },
+                                        colors = CardDefaults.cardColors(
+                                            containerColor = if (isSelected) challenge.tagColor.copy(alpha = 0.18f) else DarkSurfaceVariant
+                                        ),
+                                        border = BorderStroke(
+                                            width = if (isSelected) 2.dp else 1.dp,
+                                            color = if (isSelected) challenge.tagColor else challenge.tagColor.copy(alpha = 0.25f)
+                                        ),
+                                        shape = RoundedCornerShape(12.dp)
+                                    ) {
+                                        Column(modifier = Modifier.padding(10.dp)) {
+                                            Row(
+                                                modifier = Modifier.fillMaxWidth(),
+                                                horizontalArrangement = Arrangement.SpaceBetween,
+                                                verticalAlignment = Alignment.CenterVertically
+                                            ) {
+                                                Text(
+                                                    text = "${challenge.emoji} ${challenge.badge}",
+                                                    style = MaterialTheme.typography.labelSmall,
+                                                    color = challenge.tagColor,
+                                                    fontWeight = FontWeight.Bold,
+                                                    fontSize = 10.sp
+                                                )
+                                                if (isSelected) {
+                                                    Icon(
+                                                        Icons.Default.CheckCircle,
+                                                        contentDescription = null,
+                                                        tint = challenge.tagColor,
+                                                        modifier = Modifier.size(16.dp)
+                                                    )
+                                                }
+                                            }
+                                            Spacer(modifier = Modifier.height(6.dp))
+                                            Text(
+                                                text = challenge.title,
+                                                style = MaterialTheme.typography.bodySmall,
+                                                color = TextPrimary,
+                                                fontWeight = FontWeight.Bold,
+                                                maxLines = 2,
+                                                overflow = TextOverflow.Ellipsis,
+                                                fontSize = 11.sp,
+                                                lineHeight = 15.sp
+                                            )
+                                            Spacer(modifier = Modifier.height(4.dp))
+                                            Row(
+                                                modifier = Modifier.fillMaxWidth(),
+                                                horizontalArrangement = Arrangement.SpaceBetween,
+                                                verticalAlignment = Alignment.CenterVertically
+                                            ) {
+                                                Text(
+                                                    text = "⏰ ${challenge.time}",
+                                                    style = MaterialTheme.typography.labelSmall,
+                                                    color = TextMuted,
+                                                    fontSize = 10.sp
+                                                )
+                                                Text(
+                                                    text = if (challenge.isStrict) "🔒 اجباری" else "🟢 اختیاری",
+                                                    style = MaterialTheme.typography.labelSmall,
+                                                    color = if (challenge.isStrict) NeonAmber else NeonEmerald,
+                                                    fontSize = 10.sp,
+                                                    fontWeight = FontWeight.Bold
+                                                )
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+
                     // Task Title
                     OutlinedTextField(
                         value = title,

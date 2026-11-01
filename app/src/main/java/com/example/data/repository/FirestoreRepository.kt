@@ -134,8 +134,7 @@ class FirestoreRepository(
 
         try {
             userDoc.set(newProfileMap).await()
-            // Create default routine tasks for the new user
-            seedDefaultRoutines(userId)
+            // New users start completely clean (0 routines / صفر صفر) as requested
             return UserProfile(
                 id = userId,
                 userId = userId,
@@ -717,7 +716,7 @@ class FirestoreRepository(
 
         try {
             userDoc.set(newProfileMap).await()
-            seedDefaultRoutines(newUserId)
+            // New users start clean with zero routines (صفر صفر)
             return UserProfile(
                 id = newUserId,
                 userId = newUserId,
