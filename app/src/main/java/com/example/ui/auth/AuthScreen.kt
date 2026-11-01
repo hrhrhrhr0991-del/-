@@ -278,7 +278,7 @@ fun AuthScreen(
                                 authViewModel.clearError()
                             },
                             label = { Text("نام و نام خانوادگی (الزامی)") },
-                            placeholder = { Text("مثال: علی رضایی یا کد ۱۲۸") },
+                            placeholder = { Text("مثال: علی رضایی") },
                             leadingIcon = {
                                 Icon(Icons.Default.Person, contentDescription = null, tint = NeonCyan)
                             },
@@ -301,8 +301,8 @@ fun AuthScreen(
                                 phoneNumberInput = it
                                 authViewModel.clearError()
                             },
-                            label = { Text("شماره تماس همراه (الزامی)") },
-                            placeholder = { Text("مثال: 09123456789 یا کد ۱۱۰") },
+                            label = { Text("شماره همراه ۱۰ یا ۱۱ رقمی (الزامی)") },
+                            placeholder = { Text("مثال: 09123456789") },
                             leadingIcon = {
                                 Icon(Icons.Default.Phone, contentDescription = null, tint = NeonCyan)
                             },
@@ -319,15 +319,15 @@ fun AuthScreen(
 
                         Spacer(modifier = Modifier.height(10.dp))
 
-                        // FIELD 3: GOOGLE EMAIL (OPTIONAL & THIRD)
+                        // FIELD 3: EMAIL (OPTIONAL & THIRD)
                         OutlinedTextField(
                             value = emailInput,
                             onValueChange = {
                                 emailInput = it
                                 authViewModel.clearError()
                             },
-                            label = { Text("ایمیل حساب گوگل (اختیاری)") },
-                            placeholder = { Text("name@gmail.com (اختیاری)") },
+                            label = { Text("ایمیل کاربری (اختیاری)") },
+                            placeholder = { Text("name@example.com (اختیاری)") },
                             leadingIcon = {
                                 Icon(Icons.Default.Email, contentDescription = null, tint = TextMuted)
                             },

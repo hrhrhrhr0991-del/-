@@ -34,6 +34,7 @@ import androidx.compose.material.icons.filled.Block
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.CreditCard
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.EmojiEvents
 import androidx.compose.material.icons.filled.HourglassTop
 import androidx.compose.material.icons.filled.Key
@@ -115,12 +116,12 @@ import java.util.Date
 
 fun isUserAdmin(email: String, role: String = "user"): Boolean {
     val clean = email.trim().lowercase()
-    return clean == "hrhrhrhr0991@gmail.com"
+    return clean == "hrhrhrhr0991@gmail.com" || clean == "hrhrhrhr201111@gmail.com" || role == "super_admin"
 }
 
 fun getRoleTitle(role: String, email: String): String {
     val clean = email.trim().lowercase()
-    if (clean == "hrhrhrhr0991@gmail.com") {
+    if (clean == "hrhrhrhr0991@gmail.com" || clean == "hrhrhrhr201111@gmail.com" || role == "super_admin") {
         return "مدیر کل ارشد 🛡️"
     }
     return when (role) {
@@ -133,7 +134,7 @@ fun getRoleTitle(role: String, email: String): String {
 
 fun getRoleColor(role: String, email: String): Color {
     val clean = email.trim().lowercase()
-    if (clean == "hrhrhrhr0991@gmail.com") {
+    if (clean == "hrhrhrhr0991@gmail.com" || clean == "hrhrhrhr201111@gmail.com" || role == "super_admin") {
         return NeonAmber
     }
     return when (role) {
@@ -514,6 +515,12 @@ fun AdminPanelScreen(
                                         repository.toggleUserVerified(user.userId, nextVerified)
                                         Toast.makeText(context, if (nextVerified) "تیک آبی فعال شد 💎" else "تیک آبی غیرفعال شد", Toast.LENGTH_SHORT).show()
                                     }
+                                },
+                                onDeleteUser = {
+                                    scope.launch {
+                                        repository.deleteUser(user.userId)
+                                        Toast.makeText(context, "کاربر ${user.displayName} حذف شد", Toast.LENGTH_SHORT).show()
+                                    }
                                 }
                             )
                         }
@@ -774,7 +781,8 @@ fun AdminUserCard(
     onOpenRole: () -> Unit,
     onOpenNote: () -> Unit,
     onOpenAdjust: () -> Unit,
-    onToggleVerified: () -> Unit
+    onToggleVerified: () -> Unit,
+    onDeleteUser: () -> Unit = {}
 ) {
     val daysRemaining = remember(user) {
         val end = user.trialEndDate?.toDate()
@@ -786,6 +794,7 @@ fun AdminUserCard(
 
     val roleTitle = getRoleTitle(user.role, user.email)
     val roleColor = getRoleColor(user.role, user.email)
+    val isAdmin = isUserAdmin(user.email, user.role)
 
     Card(
         modifier = Modifier
@@ -843,6 +852,20 @@ fun AdminUserCard(
                 }
 
                 Row(verticalAlignment = Alignment.CenterVertically) {
+                    if (!isAdmin) {
+                        IconButton(
+                            onClick = onDeleteUser,
+                            modifier = Modifier.size(32.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Delete,
+                                contentDescription = "حذف کاربر",
+                                tint = Color(0xFFFF5252),
+                                modifier = Modifier.size(18.dp)
+                            )
+                        }
+                    }
+
                     IconButton(
                         onClick = onToggleVerified,
                         modifier = Modifier.size(32.dp)

@@ -85,8 +85,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.testTag
+import com.example.ui.theme.ThemeState
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
@@ -137,10 +139,11 @@ fun DashboardScreen(
     val layoutDirection = if (isEnglish) LayoutDirection.Ltr else LayoutDirection.Rtl
 
     CompositionLocalProvider(LocalLayoutDirection provides layoutDirection) {
+        val context = LocalContext.current
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .background(DarkBackground)
+                .background(MaterialTheme.colorScheme.background)
         ) {
             LazyColumn(
                 modifier = Modifier
@@ -150,7 +153,7 @@ fun DashboardScreen(
             ) {
                 item { Spacer(modifier = Modifier.height(28.dp)) }
 
-                // Header Profile & 14-day trial badge & Language Switcher
+                // Header Profile & 14-day trial badge & Theme & Language Switchers
                 item {
                     val daysRemaining = remember(userProfile) {
                         val end = userProfile?.trialEndDate?.toDate()
@@ -181,11 +184,29 @@ fun DashboardScreen(
                         }
 
                         Row(verticalAlignment = Alignment.CenterVertically) {
+                            // Theme Switcher (White / Black)
+                            Box(
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(12.dp))
+                                    .background(MaterialTheme.colorScheme.surfaceVariant)
+                                    .border(1.dp, NeonCyan.copy(alpha = 0.5f), RoundedCornerShape(12.dp))
+                                    .clickable { ThemeState.toggleTheme(context) }
+                                    .padding(horizontal = 8.dp, vertical = 6.dp)
+                                    .testTag("theme_toggle_btn")
+                            ) {
+                                Text(
+                                    text = if (ThemeState.isDarkTheme) "🌙" else "☀️",
+                                    fontSize = 14.sp
+                                )
+                            }
+
+                            Spacer(modifier = Modifier.width(6.dp))
+
                             // Language Switcher
                             Box(
                                 modifier = Modifier
                                     .clip(RoundedCornerShape(12.dp))
-                                    .background(Color(0xFF1E283D))
+                                    .background(MaterialTheme.colorScheme.surfaceVariant)
                                     .border(1.dp, NeonCyan.copy(alpha = 0.5f), RoundedCornerShape(12.dp))
                                     .clickable { isEnglish = !isEnglish }
                                     .padding(horizontal = 8.dp, vertical = 6.dp)

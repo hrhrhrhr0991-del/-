@@ -485,7 +485,7 @@ fun ChallengesHubScreen(
                             fontWeight = FontWeight.Bold
                         )
                         Text(
-                            text = "تحلیل صدم‌ثانیه‌ای صاف بودن ملحفه و بالش‌ها توسط جمینای",
+                            text = "تحلیل صدم‌ثانیه‌ای صاف بودن ملحفه و بالش‌ها توسط هوش مصنوعی اراده",
                             style = MaterialTheme.typography.bodySmall,
                             color = TextSecondary
                         )

@@ -167,7 +167,7 @@ fun OnboardingPersonaDialog(
                             fontWeight = FontWeight.Bold
                         )
                         Text(
-                            text = "تحلیل هوشمند تیپ شخصیتی با جمینای",
+                            text = "تحلیل هوشمند تیپ شخصیتی اراده",
                             style = MaterialTheme.typography.bodySmall,
                             color = TextSecondary
                         )

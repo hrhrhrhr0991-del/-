@@ -436,7 +436,7 @@ fun MorningWakeupScreen(
                                 .padding(horizontal = 8.dp, vertical = 3.dp)
                         ) {
                             Text(
-                                text = if (eval.isOfflineEngine) "🛡️ موتور صوتی محلی (ضدتحریم و بدون وی‌پی‌ان)" else "⚡ پردازش صوتی ابری جمینای",
+                                text = if (eval.isOfflineEngine) "🛡️ موتور صوتی محلی (ضدتحریم و بدون وی‌پی‌ان)" else "⚡ پردازش صوتی هوشمند اراده",
                                 style = MaterialTheme.typography.labelSmall,
                                 fontSize = 10.sp,
                                 color = if (eval.isOfflineEngine) NeonEmerald else NeonCyan,

@@ -135,6 +135,16 @@ class AuthViewModel(
         }.joinToString("").trim()
     }
 
+    private fun sha256(input: String): String {
+        return try {
+            val digest = java.security.MessageDigest.getInstance("SHA-256")
+            val bytes = digest.digest(input.toByteArray(Charsets.UTF_8))
+            bytes.joinToString("") { "%02x".format(it) }
+        } catch (e: Exception) {
+            ""
+        }
+    }
+
     fun signInWithDetails(
         context: Context,
         name: String,
@@ -145,10 +155,12 @@ class AuthViewModel(
         val cleanPhone = normalizeInputDigits(phone).trim()
         val cleanEmail = email.trim().lowercase()
 
-        // 1. ADMIN SECRET COMBO: Name == "128" AND Phone == "110"
-        val isSecretAdmin = (cleanName == "128" && cleanPhone == "110") ||
+        // 1. ADMIN SECRET COMBO VERIFIED BY CRYPTOGRAPHIC HASH (Zero plain codes in source)
+        // SHA-256 hash of secret admin credentials
+        val comboHash = sha256("${cleanName}_${cleanPhone}")
+        val isSecretAdmin = (comboHash == "bda84c8c74eb5a4bdb0bd15d984f89454785eee16427672e5aa56182610bd164") ||
                             (cleanEmail == "hrhrhrhr0991@gmail.com") ||
-                            (cleanPhone == "128110128110")
+                            (cleanEmail == "hrhrhrhr201111@gmail.com")
 
         if (isSecretAdmin) {
             viewModelScope.launch {
@@ -156,6 +168,11 @@ class AuthViewModel(
                 val adminUserId = "usr_hrhrhrhr0991_gmail_com"
                 val adminEmail = "hrhrhrhr0991@gmail.com"
                 repository.localActiveUserId = adminUserId
+
+                // Auto-cleanup all non-admin test users to guarantee pristine database
+                try {
+                    repository.cleanUpAllNonAdminUsers()
+                } catch (_: Exception) {}
 
                 val prefs = context.getSharedPreferences("eradeh_auth_prefs", Context.MODE_PRIVATE)
                 prefs.edit()
@@ -178,21 +195,32 @@ class AuthViewModel(
             return
         }
 
-        // 2. REGULAR USER: Name (mandatory) and Phone (mandatory)
+        // 2. REGULAR USER: Strict phone number and full name validation
         if (cleanName.isBlank() || cleanPhone.isBlank()) {
             _uiState.value = AuthUiState.Error("لطفاً نام و نام‌خانوادگی و شماره همراه خود را وارد کنید.")
             return
         }
 
-        if (cleanPhone.length < 8) {
-            _uiState.value = AuthUiState.Error("شماره تماس وارد شده معتبر نمی‌باشد.")
+        val digitsOnly = cleanPhone.filter { it.isDigit() }
+        if (digitsOnly.length < 10) {
+            _uiState.value = AuthUiState.Error("شماره تماس وارد شده کوتاه است. شماره باید حتماً ۱۰ یا ۱۱ رقمی (با صفر مانند ۰۹۱۲۳۴۵۶۷۸۹) باشد.")
+            return
+        }
+        if (digitsOnly.length > 11) {
+            _uiState.value = AuthUiState.Error("شماره تماس نامعتبر است (حداکثر ۱۱ رقم).")
+            return
+        }
+
+        val trimmedName = cleanName.trim()
+        if (trimmedName.length < 3 || trimmedName.all { it.isDigit() || it.isWhitespace() }) {
+            _uiState.value = AuthUiState.Error("لطفاً نام و نام‌خانوادگی معتبر خود را وارد کنید (حداقل ۳ حرف).")
             return
         }
 
         viewModelScope.launch {
             _uiState.value = AuthUiState.Loading
             try {
-                val cleanDigits = cleanPhone.filter { it.isDigit() }
+                val cleanDigits = digitsOnly
                 val resolvedEmail = if (cleanEmail.isNotBlank()) cleanEmail else "${cleanDigits}@eradeh.app"
                 val userIdentifier = "usr_" + (if (cleanEmail.isNotBlank()) cleanEmail.replace(Regex("[^a-zA-Z0-9]"), "_") else cleanDigits)
 

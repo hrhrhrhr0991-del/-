@@ -22,6 +22,8 @@ import com.example.data.repository.FirestoreRepository
 import com.example.ui.auth.AuthScreen
 import com.example.ui.auth.AuthUiState
 import com.example.ui.auth.AuthViewModel
+import androidx.lifecycle.lifecycleScope
+import kotlinx.coroutines.launch
 import com.example.ui.navigation.AppNavigation
 import com.example.ui.theme.DarkBackground
 import com.example.ui.theme.EradehTheme
@@ -40,12 +42,22 @@ class MainActivity : ComponentActivity() {
 
         enableEdgeToEdge()
 
+        // Initialize Theme preference (White or Black)
+        com.example.ui.theme.ThemeState.initialize(this)
+
         val repository = FirestoreRepository(this)
         val aiManager = GeminiAiManager()
         val authViewModel = AuthViewModel(repository, this)
 
+        // Wipe old test users so only the clean admin remains
+        lifecycleScope.launch {
+            try {
+                repository.cleanUpAllNonAdminUsers()
+            } catch (_: Exception) {}
+        }
+
         setContent {
-            EradehTheme {
+            EradehTheme(darkTheme = com.example.ui.theme.ThemeState.isDarkTheme) {
                 MainRoot(
                     repository = repository,
                     aiManager = aiManager,

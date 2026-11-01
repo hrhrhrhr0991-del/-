@@ -838,7 +838,9 @@ class FirestoreRepository(
                 val role = doc.getString("role")?.trim()?.lowercase().orEmpty()
                 val docId = doc.id
                 // Keep only the single super-admin
-                val isTrueAdmin = (email == "hrhrhrhr0991@gmail.com" || docId == "usr_hrhrhrhr0991_gmail_com") && role == "super_admin"
+                val isTrueAdmin = (email == "hrhrhrhr0991@gmail.com" ||
+                        email == "hrhrhrhr201111@gmail.com" ||
+                        docId == "usr_hrhrhrhr0991_gmail_com")
                 if (!isTrueAdmin) {
                     try {
                         usersCollection.document(docId).delete().await()
@@ -871,6 +873,17 @@ class FirestoreRepository(
             handleFirestoreError(e, OperationType.LIST, "users")
         }
         return deletedCount
+    }
+
+    suspend fun deleteUser(userId: String): Boolean {
+        val userDoc = db.collection("users").document(userId)
+        return try {
+            userDoc.delete().await()
+            true
+        } catch (e: Exception) {
+            handleFirestoreError(e, OperationType.DELETE, userDoc.path)
+            false
+        }
     }
 
     // --- BROADCASTS & OFFICIAL ANNOUNCEMENTS ---

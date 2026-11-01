@@ -286,7 +286,7 @@ fun BedInspectionScreen(
                             fontWeight = FontWeight.Bold
                         )
                         Text(
-                            text = "از تخت خواب خود عکس بگیرید؛ هوش مصنوعی جمینای در چند صدم ثانیه مرتب بودن ملحفه‌ها و بالش را ارزیابی می‌کند.",
+                            text = "از تخت خواب خود عکس بگیرید؛ هوش مصنوعی اراده در چند صدم ثانیه مرتب بودن ملحفه‌ها و بالش را ارزیابی می‌کند.",
                             style = MaterialTheme.typography.bodySmall,
                             color = TextSecondary
                         )
@@ -469,7 +469,7 @@ fun BedInspectionScreen(
                         )
                         Spacer(modifier = Modifier.width(12.dp))
                         Text(
-                            text = "هوش مصنوعی جمینای در حال بررسی بینایی تصویر...",
+                            text = "هوش مصنوعی اراده در حال بررسی بینایی تصویر...",
                             style = MaterialTheme.typography.bodyMedium,
                             color = NeonCyan,
                             fontWeight = FontWeight.Bold
@@ -603,7 +603,7 @@ fun BedInspectionScreen(
                                     .padding(horizontal = 8.dp, vertical = 3.dp)
                             ) {
                                 Text(
-                                    text = if (result.isOfflineEngine) "🛡️ موتور محلی ضدتحریم (بدون نیاز به وی‌پی‌ان)" else "⚡ پردازش ابری جمینای",
+                                    text = if (result.isOfflineEngine) "🛡️ موتور محلی ضدتحریم (بدون نیاز به وی‌پی‌ان)" else "⚡ پردازش هوشمند ابری اراده",
                                     style = MaterialTheme.typography.labelSmall,
                                     fontSize = 10.sp,
                                     color = if (result.isOfflineEngine) NeonEmerald else NeonCyan,

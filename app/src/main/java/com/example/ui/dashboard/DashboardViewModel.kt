@@ -116,7 +116,7 @@ class DashboardViewModel(
                     repeatDays = "هر روز"
                 ),
                 RoutineTask(
-                    title = "🛏️ اسکن تصویری تختخواب با جمینای",
+                    title = "🛏️ اسکن تصویری هوشمند تختخواب",
                     type = "bed_inspection",
                     targetTime = "07:00",
                     strictLockEnabled = true,
