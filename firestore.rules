@@ -34,7 +34,11 @@ service cloud.firestore {
         (!('lastActiveDate' in data) || data.lastActiveDate is string) &&
         (!('totalFocusMinutes' in data) || data.totalFocusMinutes is int) &&
         (!('isSubscribed' in data) || data.isSubscribed is bool) &&
-        (!('subscriptionPlan' in data) || data.subscriptionPlan is string);
+        (!('subscriptionPlan' in data) || data.subscriptionPlan is string) &&
+        (!('role' in data) || data.role is string) &&
+        (!('unlockedBadges' in data) || data.unlockedBadges is list) &&
+        (!('adminNote' in data) || data.adminNote is string) &&
+        (!('isBanned' in data) || data.isBanned is bool);
     }
 
     function isValidRoutineTask(data, userId) {

@@ -79,27 +79,46 @@ class FirestoreRepository(
             null
         }
 
+        val cleanEmail = email.trim().lowercase()
+        val isSuperAdminEmail = cleanEmail == "hrhrhrhr0991@gmail.com" || cleanEmail == "hrhrhrhr201111@gmail.com"
+
         if (snapshot != null && snapshot.exists()) {
             val profile = snapshot.toObject(UserProfile::class.java)
-            if (profile != null) return profile
+            if (profile != null) {
+                if (isSuperAdminEmail && profile.role != "super_admin") {
+                    try {
+                        userDoc.update("role", "super_admin").await()
+                        return profile.copy(role = "super_admin")
+                    } catch (e: Exception) {
+                        return profile
+                    }
+                }
+                return profile
+            }
         }
 
         // Calculate 14 days trial end date
         val now = Date()
         val calendar = Calendar.getInstance()
         calendar.time = now
-        calendar.add(Calendar.DAY_OF_YEAR, 14)
+        calendar.add(Calendar.DAY_OF_YEAR, if (isSuperAdminEmail) 3650 else 14)
         val trialEnd = Timestamp(calendar.time)
         val trialStart = Timestamp(now)
+        val initialRole = if (isSuperAdminEmail) "super_admin" else "user"
 
         val newProfileMap = mapOf(
             "userId" to userId,
             "email" to email,
             "phoneNumber" to phoneNumber,
             "displayName" to displayName,
+            "role" to initialRole,
+            "unlockedBadges" to emptyList<String>(),
+            "adminNote" to "",
+            "isBanned" to false,
             "trialStartDate" to trialStart,
             "trialEndDate" to trialEnd,
             "streakCount" to 1L,
+            "isSubscribed" to isSuperAdminEmail,
             "lastActiveDate" to java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.US).format(now),
             "createdAt" to FieldValue.serverTimestamp(),
             "updatedAt" to FieldValue.serverTimestamp()
@@ -115,9 +134,14 @@ class FirestoreRepository(
                 email = email,
                 phoneNumber = phoneNumber,
                 displayName = displayName,
+                role = initialRole,
+                unlockedBadges = emptyList(),
+                adminNote = "",
+                isBanned = false,
                 trialStartDate = trialStart,
                 trialEndDate = trialEnd,
-                streakCount = 1L
+                streakCount = 1L,
+                isSubscribed = isSuperAdminEmail
             )
         } catch (e: CancellationException) {
             throw e
@@ -532,6 +556,180 @@ class FirestoreRepository(
             throw e
         } catch (e: Exception) {
             handleFirestoreError(e, OperationType.UPDATE, userDoc.path)
+            throw e
+        }
+    }
+
+    suspend fun updateUserRole(targetUserId: String, newRole: String) {
+        val userDoc = db.collection("users").document(targetUserId)
+        try {
+            userDoc.update(
+                mapOf(
+                    "role" to newRole,
+                    "updatedAt" to FieldValue.serverTimestamp()
+                )
+            ).await()
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            handleFirestoreError(e, OperationType.UPDATE, userDoc.path)
+            throw e
+        }
+    }
+
+    suspend fun updateUserBadges(targetUserId: String, badges: List<String>) {
+        val userDoc = db.collection("users").document(targetUserId)
+        try {
+            userDoc.update(
+                mapOf(
+                    "unlockedBadges" to badges,
+                    "updatedAt" to FieldValue.serverTimestamp()
+                )
+            ).await()
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            handleFirestoreError(e, OperationType.UPDATE, userDoc.path)
+            throw e
+        }
+    }
+
+    suspend fun updateUserStreak(targetUserId: String, newStreak: Long) {
+        val userDoc = db.collection("users").document(targetUserId)
+        try {
+            userDoc.update(
+                mapOf(
+                    "streakCount" to newStreak.coerceAtLeast(0L),
+                    "updatedAt" to FieldValue.serverTimestamp()
+                )
+            ).await()
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            handleFirestoreError(e, OperationType.UPDATE, userDoc.path)
+            throw e
+        }
+    }
+
+    suspend fun updateUserAdminNote(targetUserId: String, note: String) {
+        val userDoc = db.collection("users").document(targetUserId)
+        try {
+            userDoc.update(
+                mapOf(
+                    "adminNote" to note,
+                    "updatedAt" to FieldValue.serverTimestamp()
+                )
+            ).await()
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            handleFirestoreError(e, OperationType.UPDATE, userDoc.path)
+            throw e
+        }
+    }
+
+    suspend fun toggleUserBan(targetUserId: String, isBanned: Boolean) {
+        val userDoc = db.collection("users").document(targetUserId)
+        try {
+            userDoc.update(
+                mapOf(
+                    "isBanned" to isBanned,
+                    "updatedAt" to FieldValue.serverTimestamp()
+                )
+            ).await()
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            handleFirestoreError(e, OperationType.UPDATE, userDoc.path)
+            throw e
+        }
+    }
+
+    suspend fun adminAdjustSubscription(targetUserId: String, deltaDays: Long) {
+        val userDoc = db.collection("users").document(targetUserId)
+        try {
+            val userSnap = userDoc.get().await()
+            val currentEndDate = userSnap.getTimestamp("trialEndDate")?.toDate() ?: Date()
+            val cal = Calendar.getInstance().apply {
+                time = currentEndDate
+                add(Calendar.DAY_OF_YEAR, deltaDays.toInt())
+            }
+            val newEndTime = cal.time
+            val isStillSubscribed = newEndTime.after(Date())
+            userDoc.update(
+                mapOf(
+                    "trialEndDate" to Timestamp(newEndTime),
+                    "isSubscribed" to isStillSubscribed,
+                    "updatedAt" to FieldValue.serverTimestamp()
+                )
+            ).await()
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            handleFirestoreError(e, OperationType.UPDATE, userDoc.path)
+            throw e
+        }
+    }
+
+    suspend fun adminCreateUser(
+        displayName: String,
+        email: String,
+        phone: String,
+        role: String,
+        durationDays: Long
+    ): UserProfile {
+        val newUserId = "user_manual_${System.currentTimeMillis().toString().takeLast(8)}"
+        val userDoc = db.collection("users").document(newUserId)
+        val now = Date()
+        val calendar = Calendar.getInstance().apply {
+            time = now
+            add(Calendar.DAY_OF_YEAR, durationDays.toInt().coerceAtLeast(1))
+        }
+        val trialEnd = Timestamp(calendar.time)
+        val trialStart = Timestamp(now)
+
+        val newProfileMap = mapOf(
+            "userId" to newUserId,
+            "email" to email,
+            "phoneNumber" to phone,
+            "displayName" to displayName,
+            "role" to role,
+            "unlockedBadges" to emptyList<String>(),
+            "adminNote" to "",
+            "isBanned" to false,
+            "trialStartDate" to trialStart,
+            "trialEndDate" to trialEnd,
+            "streakCount" to 1L,
+            "isSubscribed" to (durationDays > 14),
+            "subscriptionPlan" to if (durationDays > 14) "ثبت مستقیم مدیریت" else "",
+            "lastActiveDate" to java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.US).format(now),
+            "createdAt" to FieldValue.serverTimestamp(),
+            "updatedAt" to FieldValue.serverTimestamp()
+        )
+
+        try {
+            userDoc.set(newProfileMap).await()
+            seedDefaultRoutines(newUserId)
+            return UserProfile(
+                id = newUserId,
+                userId = newUserId,
+                email = email,
+                phoneNumber = phone,
+                displayName = displayName,
+                role = role,
+                unlockedBadges = emptyList(),
+                adminNote = "",
+                isBanned = false,
+                trialStartDate = trialStart,
+                trialEndDate = trialEnd,
+                streakCount = 1L,
+                isSubscribed = (durationDays > 14),
+                subscriptionPlan = if (durationDays > 14) "ثبت مستقیم مدیریت" else ""
+            )
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            handleFirestoreError(e, OperationType.CREATE, userDoc.path)
             throw e
         }
     }

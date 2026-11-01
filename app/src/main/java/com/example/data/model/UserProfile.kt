@@ -21,6 +21,10 @@ data class UserProfile(
     val totalFocusMinutes: Long = 0L,
     val isSubscribed: Boolean = false,
     val subscriptionPlan: String = "",
+    val role: String = "user",
+    val unlockedBadges: List<String> = emptyList(),
+    val adminNote: String = "",
+    val isBanned: Boolean = false,
     @ServerTimestamp val createdAt: Timestamp? = null,
     @ServerTimestamp val updatedAt: Timestamp? = null
 )

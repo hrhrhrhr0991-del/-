@@ -89,8 +89,10 @@ import java.util.Date
 
 import androidx.compose.foundation.clickable
 import androidx.compose.material.icons.filled.AdminPanelSettings
+import androidx.compose.material.icons.filled.Warning
 import androidx.compose.runtime.collectAsState
 import com.example.ui.admin.AdminPanelScreen
+import com.example.ui.admin.getRoleTitle
 import com.example.ui.admin.isUserAdmin
 import com.example.ui.auth.CompleteProfileDialog
 import com.example.ui.subscription.SubscriptionScreen
@@ -121,7 +123,60 @@ fun AppNavigation(
     val context = LocalContext.current
     val liveProfile by repository.observeUserProfile(currentUserId).collectAsState(initial = userProfile)
     val currentProfile = liveProfile ?: userProfile
-    val isAdmin = isUserAdmin(currentProfile.email)
+    val isAdmin = isUserAdmin(currentProfile.email, currentProfile.role)
+
+    if (currentProfile.isBanned) {
+        CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Rtl) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(DarkBackground)
+                    .padding(24.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = CardDefaults.cardColors(containerColor = DarkSurface),
+                    shape = RoundedCornerShape(20.dp)
+                ) {
+                    Column(
+                        modifier = Modifier.padding(24.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Warning,
+                            contentDescription = null,
+                            tint = Color(0xFFFF5252),
+                            modifier = Modifier.size(56.dp)
+                        )
+                        Spacer(modifier = Modifier.height(16.dp))
+                        Text(
+                            text = "حساب کاربری مسدود شده است 🚫",
+                            style = MaterialTheme.typography.titleLarge,
+                            color = Color(0xFFFF5252),
+                            fontWeight = FontWeight.Bold
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text(
+                            text = currentProfile.adminNote.ifBlank { "حساب کاربری شما توسط مدیر سیستم به حالت تعلیق درآمده است." },
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = TextSecondary,
+                            textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                        )
+                        Spacer(modifier = Modifier.height(24.dp))
+                        Button(
+                            onClick = { authViewModel.signOut(context) },
+                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF331A22), contentColor = Color(0xFFFF5252)),
+                            shape = RoundedCornerShape(12.dp)
+                        ) {
+                            Text("خروج از حساب کاربری")
+                        }
+                    }
+                }
+            }
+        }
+        return
+    }
 
     val isTrialExpired = remember(currentProfile, isAdmin) {
         if (isAdmin) return@remember false
@@ -595,11 +650,41 @@ fun ProfileScreen(
                             )
                         }
                         Text(
-                            text = if (isAdmin) "ادمین کل 🛡️" else "$daysRemaining روز باقی‌مانده",
+                            text = if (isAdmin) getRoleTitle(profile.role, profile.email) else "$daysRemaining روز باقی‌مانده",
                             style = MaterialTheme.typography.bodyMedium,
-                            color = TextPrimary,
+                            color = if (isAdmin) NeonAmber else TextPrimary,
                             fontWeight = FontWeight.Bold
                         )
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(14.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Text("سطح دسترسی و نقش:", color = TextSecondary)
+                    Text(
+                        text = getRoleTitle(profile.role, profile.email),
+                        color = if (isAdmin) NeonAmber else NeonCyan,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+
+                if (profile.adminNote.isNotBlank()) {
+                    Spacer(modifier = Modifier.height(14.dp))
+                    Card(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .border(1.dp, NeonAmber, RoundedCornerShape(12.dp)),
+                        colors = CardDefaults.cardColors(containerColor = NeonAmber.copy(alpha = 0.12f)),
+                        shape = RoundedCornerShape(12.dp)
+                    ) {
+                        Column(modifier = Modifier.padding(12.dp)) {
+                            Text("پیام مربی / مدیر اراده:", color = NeonAmber, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.labelSmall)
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Text(profile.adminNote, color = TextPrimary, style = MaterialTheme.typography.bodySmall)
+                        }
                     }
                 }
 

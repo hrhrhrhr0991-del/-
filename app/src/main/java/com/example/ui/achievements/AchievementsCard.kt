@@ -46,7 +46,19 @@ data class DisciplineBadge(
     val title: String,
     val iconEmoji: String,
     val requirement: String,
-    val isUnlocked: Boolean
+    val isUnlocked: Boolean,
+    val isGrantedByAdmin: Boolean = false
+)
+
+val ALL_BADGES_DEFINITIONS = listOf(
+    DisciplineBadge("wake_1", "سحرخیز پولادین", "🌅", "اولین بیداری صبحگاهی با چالش صوتی", false),
+    DisciplineBadge("bed_1", "فرمانده نظم", "🛏️", "تایید چالش مرتب‌سازی تخت خواب", false),
+    DisciplineBadge("focus_1", "ذهن زلال و متمرکز", "⚡", "تکمیل جلسه تمرکز عمیق (۲۰+ دقیقه)", false),
+    DisciplineBadge("streak_3", "آتش استمرار ۳ روزه", "🔥", "حفظ اراده به مدت ۳ روز متوالی", false),
+    DisciplineBadge("streak_7", "انضباط آهنین ۷ روزه", "🛡️", "۷ روز پایبندی مداوم به روتین‌ها", false),
+    DisciplineBadge("conqueror", "فاتح دوره اراده", "👑", "پایان پیروزمندانه دوره ۱۴ روزه", false),
+    DisciplineBadge("honor_gold", "مدال طلایی اراده و شرافت", "🏅", "اعطای ویژه توسط مدیر یا اشتراک طلایی", false),
+    DisciplineBadge("discipline_master", "استاد بزرگ انضباط فردی", "🏆", "بالاترین سطح پایداری و استقامت فردی", false)
 )
 
 @Composable
@@ -57,14 +69,22 @@ fun AchievementsCard(
     val streak = userProfile.streakCount
     val totalFocus = userProfile.totalFocusMinutes
 
-    val badges = listOf(
-        DisciplineBadge("wake_1", "سحرخیز پولادین", "🌅", "اولین بیداری صبحگاهی با چالش صوتی", streak >= 1),
-        DisciplineBadge("bed_1", "فرمانده نظم", "🛏️", "تایید چالش مرتب‌سازی تخت خواب", streak >= 1),
-        DisciplineBadge("focus_1", "ذهن زلال و متمرکز", "⚡", "تکمیل جلسه تمرکز عمیق", totalFocus >= 20),
-        DisciplineBadge("streak_3", "آتش استمرار ۳ روزه", "🔥", "حفظ اراده به مدت ۳ روز متوالی", streak >= 3),
-        DisciplineBadge("streak_7", "انضباط آهنین ۷ روزه", "🛡️", "۷ روز پایبندی مداوم به روتین‌ها", streak >= 7),
-        DisciplineBadge("conqueror", "فاتح دوره اراده", "👑", "پایان پیروزمندانه دوره ۱۴ روزه", streak >= 14)
-    )
+    val badges = ALL_BADGES_DEFINITIONS.map { badge ->
+        val granted = badge.id in userProfile.unlockedBadges
+        val naturallyEarned = when (badge.id) {
+            "wake_1" -> streak >= 1
+            "bed_1" -> streak >= 1
+            "focus_1" -> totalFocus >= 20
+            "streak_3" -> streak >= 3
+            "streak_7" -> streak >= 7
+            "conqueror" -> streak >= 14
+            "honor_gold" -> streak >= 21 || userProfile.isSubscribed
+            "discipline_master" -> streak >= 30
+            else -> false
+        }
+        val isUnlocked = granted || naturallyEarned
+        badge.copy(isUnlocked = isUnlocked, isGrantedByAdmin = granted)
+    }
 
     val unlockedCount = badges.count { it.isUnlocked }
 
@@ -134,10 +154,10 @@ fun AchievementsCard(
                                 fontWeight = FontWeight.Bold
                             )
                             Text(
-                                text = badge.requirement,
+                                text = if (badge.isGrantedByAdmin) "${badge.requirement} • اعطا شده توسط مدیر کل 🏅" else badge.requirement,
                                 style = MaterialTheme.typography.bodySmall,
                                 fontSize = 11.sp,
-                                color = if (badge.isUnlocked) TextSecondary else TextMuted
+                                color = if (badge.isGrantedByAdmin) NeonAmber else if (badge.isUnlocked) TextSecondary else TextMuted
                             )
                         }
                         if (badge.isUnlocked) {
