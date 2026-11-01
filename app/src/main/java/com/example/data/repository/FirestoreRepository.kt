@@ -30,7 +30,15 @@ class FirestoreRepository(
     constructor(context: Context) : this(
         FirebaseFirestore.getInstance(
             context.applicationContext.getString(R.string.firestore_database_id)
-        )
+        ).apply {
+            try {
+                firestoreSettings = com.google.firebase.firestore.firestoreSettings {
+                    setLocalCacheSettings(com.google.firebase.firestore.persistentCacheSettings {})
+                }
+            } catch (e: Exception) {
+                // Ignore if settings were already initialized
+            }
+        }
     )
 
     private val auth = Firebase.auth
@@ -67,10 +75,10 @@ class FirestoreRepository(
             throw e
         } catch (e: Exception) {
             handleFirestoreError(e, OperationType.GET, userDoc.path)
-            throw e
+            null
         }
 
-        if (snapshot.exists()) {
+        if (snapshot != null && snapshot.exists()) {
             val profile = snapshot.toObject(UserProfile::class.java)
             if (profile != null) return profile
         }
@@ -328,11 +336,26 @@ class FirestoreRepository(
         val docRef = db.collection("users").document(uid).collection("notes").document(noteId)
         try {
             docRef.delete().await()
-        } catch (e: CancellationException) {
-            throw e
         } catch (e: Exception) {
             handleFirestoreError(e, OperationType.DELETE, docRef.path)
             throw e
+        }
+    }
+
+    suspend fun logFocusSession(minutes: Int) {
+        val uid = requireUserId()
+        val docRef = db.collection("users").document(uid)
+        try {
+            docRef.update(
+                mapOf(
+                    "totalFocusMinutes" to FieldValue.increment(minutes.toLong()),
+                    "updatedAt" to FieldValue.serverTimestamp()
+                )
+            ).await()
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            handleFirestoreError(e, OperationType.UPDATE, docRef.path)
         }
     }
 }

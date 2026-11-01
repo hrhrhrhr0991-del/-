@@ -59,6 +59,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.example.data.ai.GeminiAiManager
 import com.example.data.model.RoutineTask
 import com.example.data.model.UserProfile
@@ -70,6 +71,12 @@ import com.example.ui.dashboard.DashboardScreen
 import com.example.ui.dashboard.DashboardViewModel
 import com.example.ui.notes.NotesScreen
 import com.example.ui.notes.NotesViewModel
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.filled.HourglassBottom
+import androidx.compose.material.icons.filled.Shield
+import com.example.ui.achievements.AchievementsCard
+import com.example.ui.focus.FocusScreen
 import com.example.ui.theme.DarkBackground
 import com.example.ui.theme.DarkSurface
 import com.example.ui.theme.NeonAmber
@@ -83,6 +90,7 @@ import java.util.Date
 enum class MainTab(val title: String, val icon: ImageVector) {
     DASHBOARD("داشبورد", Icons.Default.Home),
     CHALLENGES("چالش‌ها", Icons.Default.Assignment),
+    FOCUS("تمرکز", Icons.Default.HourglassBottom),
     NOTES("یادداشت‌ها", Icons.Default.NoteAlt),
     PROFILE("پروفایل", Icons.Default.Person)
 }
@@ -216,6 +224,12 @@ fun AppNavigation(
                                             )
                                         )
                                     }
+                                )
+                            }
+                            MainTab.FOCUS -> {
+                                FocusScreen(
+                                    userProfile = userProfile,
+                                    repository = repository
                                 )
                             }
                             MainTab.NOTES -> {
@@ -369,7 +383,8 @@ fun ProfileScreen(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .padding(20.dp)
+            .padding(horizontal = 20.dp)
+            .verticalScroll(rememberScrollState())
     ) {
         Spacer(modifier = Modifier.height(28.dp))
         Text(
@@ -379,7 +394,41 @@ fun ProfileScreen(
             fontWeight = FontWeight.Bold
         )
 
-        Spacer(modifier = Modifier.height(20.dp))
+        Spacer(modifier = Modifier.height(16.dp))
+
+        // ANTI-SANCTION & OFFLINE ENGINE BADGE CARD
+        Card(
+            modifier = Modifier
+                .fillMaxWidth()
+                .border(1.dp, NeonEmerald.copy(alpha = 0.5f), RoundedCornerShape(18.dp)),
+            colors = CardDefaults.cardColors(containerColor = DarkSurface),
+            shape = RoundedCornerShape(18.dp)
+        ) {
+            Row(
+                modifier = Modifier.padding(16.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Icon(Icons.Default.Shield, contentDescription = null, tint = NeonEmerald, modifier = Modifier.size(30.dp))
+                Spacer(modifier = Modifier.width(12.dp))
+                Column {
+                    Text(
+                        text = "موتور ضدتحریم و آفلاین فعال است 🛡️",
+                        style = MaterialTheme.typography.titleSmall,
+                        color = NeonEmerald,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Spacer(modifier = Modifier.height(3.dp))
+                    Text(
+                        text = "تمامی بخش‌های اپلیکیشن (چالش عکس، تایمر تمرکز، روتین‌ها و دیتابیس) بدون نیاز به وی‌پی‌ان و حتی در حالت آفلاین ۱۰۰٪ در دسترس هستند.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = TextSecondary,
+                        fontSize = 11.sp
+                    )
+                }
+            }
+        }
+
+        Spacer(modifier = Modifier.height(16.dp))
 
         Card(
             modifier = Modifier
@@ -489,11 +538,21 @@ fun ProfileScreen(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
+                    Text("دقایق تمرکز عمیق:", color = TextSecondary)
+                    Text("${profile.totalFocusMinutes} دقیقه ⚡", color = NeonCyan, fontWeight = FontWeight.Bold)
+                }
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
                     Text("شناسه کاربری:", color = TextSecondary)
                     Text(profile.userId.take(10) + "...", color = TextMuted)
                 }
 
-                Spacer(modifier = Modifier.height(24.dp))
+                Spacer(modifier = Modifier.height(20.dp))
 
                 Button(
                     onClick = onSignOut,
@@ -507,5 +566,12 @@ fun ProfileScreen(
                 }
             }
         }
+
+        Spacer(modifier = Modifier.height(20.dp))
+
+        // ACHIEVEMENTS AND MEDALS CARD
+        AchievementsCard(userProfile = profile)
+
+        Spacer(modifier = Modifier.height(80.dp))
     }
 }

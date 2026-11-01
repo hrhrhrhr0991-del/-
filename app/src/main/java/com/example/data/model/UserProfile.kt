@@ -18,6 +18,7 @@ data class UserProfile(
     val lastActiveDate: String = "",
     val personaArchetype: String = "",
     val aiCoachTone: String = "",
+    val totalFocusMinutes: Long = 0L,
     @ServerTimestamp val createdAt: Timestamp? = null,
     @ServerTimestamp val updatedAt: Timestamp? = null
 )

@@ -596,6 +596,23 @@ fun BedInspectionScreen(
 
                             Spacer(modifier = Modifier.height(10.dp))
 
+                            Box(
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(6.dp))
+                                    .background(if (result.isOfflineEngine) NeonEmerald.copy(alpha = 0.15f) else NeonCyan.copy(alpha = 0.15f))
+                                    .padding(horizontal = 8.dp, vertical = 3.dp)
+                            ) {
+                                Text(
+                                    text = if (result.isOfflineEngine) "🛡️ موتور محلی ضدتحریم (بدون نیاز به وی‌پی‌ان)" else "⚡ پردازش ابری جمینای",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    fontSize = 10.sp,
+                                    color = if (result.isOfflineEngine) NeonEmerald else NeonCyan,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+
+                            Spacer(modifier = Modifier.height(6.dp))
+
                             Text(
                                 text = result.feedback,
                                 style = MaterialTheme.typography.bodyMedium,

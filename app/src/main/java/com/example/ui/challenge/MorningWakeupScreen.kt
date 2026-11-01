@@ -428,7 +428,22 @@ fun MorningWakeupScreen(
                             style = MaterialTheme.typography.labelMedium,
                             color = TextSecondary
                         )
-                        Spacer(modifier = Modifier.height(12.dp))
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Box(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(6.dp))
+                                .background(if (eval.isOfflineEngine) NeonEmerald.copy(alpha = 0.15f) else NeonCyan.copy(alpha = 0.15f))
+                                .padding(horizontal = 8.dp, vertical = 3.dp)
+                        ) {
+                            Text(
+                                text = if (eval.isOfflineEngine) "🛡️ موتور صوتی محلی (ضدتحریم و بدون وی‌پی‌ان)" else "⚡ پردازش صوتی ابری جمینای",
+                                style = MaterialTheme.typography.labelSmall,
+                                fontSize = 10.sp,
+                                color = if (eval.isOfflineEngine) NeonEmerald else NeonCyan,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                        Spacer(modifier = Modifier.height(10.dp))
                         Text(
                             text = eval.feedback,
                             style = MaterialTheme.typography.bodyMedium,
