@@ -107,37 +107,84 @@ class GeminiAiManager {
     }
 
     /**
+     * Resizes a bitmap so that its maximum dimension does not exceed maxDimension.
+     * Keeps aspect ratio intact and avoids huge payloads and OOM errors.
+     */
+    private fun scaleBitmapDown(bitmap: Bitmap, maxDimension: Int = 800): Bitmap {
+        val originalWidth = bitmap.width
+        val originalHeight = bitmap.height
+        if (originalWidth <= maxDimension && originalHeight <= maxDimension) {
+            return bitmap
+        }
+        val ratio = originalWidth.toFloat() / originalHeight.toFloat()
+        val width: Int
+        val height: Int
+        if (originalWidth > originalHeight) {
+            width = maxDimension
+            height = (maxDimension / ratio).toInt().coerceAtLeast(1)
+        } else {
+            height = maxDimension
+            width = (maxDimension * ratio).toInt().coerceAtLeast(1)
+        }
+        return Bitmap.createScaledBitmap(bitmap, width, height, true)
+    }
+
+    /**
      * Inspects bed image with automatic cloud/offline fallback.
-     * Guaranteed never to fail due to Iranian network restrictions or VPN blocks.
+     * Strictly verifies whether the image actually depicts a bed, and verifies neatness.
+     * Handles mobile internet latency and Iranian network restrictions without crashing.
      */
     suspend fun inspectBedImage(bitmap: Bitmap, forceOffline: Boolean = false): BedInspectionResult {
+        val scaledBitmap = scaleBitmapDown(bitmap, 800)
         if (forceOffline) {
-            return inspectBedImageLocally(bitmap)
+            return inspectBedImageLocally(scaledBitmap)
         }
 
         return try {
-            val response = withTimeout(12_000L) {
+            val response = withTimeout(35_000L) {
                 visionModel.generateContent(
                     content {
-                        image(bitmap)
+                        image(scaledBitmap)
                         text(
-                            "مهم‌ترین گام: ابتدا بررسی کن آیا تصویر ارسالی واقعاً یک تخت خواب، رختخواب، ملحفه یا فضای خواب است یا تصویری نامرتبط است؟ " +
-                            "اگر تصویر نامرتبط است (مانند چهره افراد، دیوار، زمین، سقف، مانیتور، کفش، غذا، حیوان یا اجسام دیگر)، " +
-                            "باید فیلد isRelevant را false بگذاری و فیلد isTidy را false و score را ۰ بگذاری، و در feedback بنویسی: 'تصویر نامرتبط است! لطفاً فقط از تخت خواب خود عکس بگیرید.' " +
-                            "فقط در صورتی که تصویر مربوط به تخت خواب باشد، isRelevant را true بگذار و بررسی دقیق کن آیا تخت خواب به درستی و منظم مرتب شده است؟ " +
-                            "ملحفه‌ها باید کاملاً صاف باشند و بالش‌ها و پتو در جای مناسب قرار گرفته باشند. " +
-                            "اگر تخت نامرتب است دقیقاً بگو کجایش ایراد دارد (مثلاً چروک ملحفه، کج بودن بالش، تا نشدن پتو). " +
-                            "پاسخ را دقیقاً در قالب اسکیما به زبان فارسی روان بده."
+                            "نقش تو یک ارزیاب سخت‌گیر و دقیق انضباط فردی و مرتب بودن تخت خواب برای اپلیکیشن 'اراده' است.\n\n" +
+                            "گام نخست (بسیار مهم - تشخیص مرتبط بودن عکس):\n" +
+                            "بررسی کن آیا این تصویر واقعاً از یک تخت خواب، رختخواب، تشک، ملحفه، بالش یا پتوی مرتب یا نامرتب است؟\n" +
+                            "اگر تصویر مربوط به موارد زیر است:\n" +
+                            "- چهره انسان یا عکس سلفی\n" +
+                            "- دست، پا یا بدن بدون نمای واضح تخت خواب\n" +
+                            "- دیوار خالی، زمین، سقف، فرش خالی بدون رختخواب\n" +
+                            "- میز کار، کامپیوتر، لپ‌تاپ یا مانیتور\n" +
+                            "- کفش، لباس رها شده روی زمین یا صندلی\n" +
+                            "- حیوانات، گل و گیاه، غذا یا فضای بیرون از اتاق\n" +
+                            "- تصاویر سیاه، مات، تار یا مبهم\n" +
+                            "باید فوراً:\n" +
+                            "isRelevant = false\n" +
+                            "isTidy = false\n" +
+                            "score = 0\n" +
+                            "feedback = 'تصویر نامرتبط تشخیص داده شد! لطفاً دوربین را مستقیماً به سمت تخت خواب یا رختخواب خود بگیرید.'\n" +
+                            "issues = ['عکس ارسالی مربوط به تخت خواب نیست']\n\n" +
+                            "گام دوم (فقط در صورت مرتبط بودن تخت خواب - isRelevant = true):\n" +
+                            "دقت کن: آیا تخت واقعاً مرتب، آنکارد و تمیز شده است؟\n" +
+                            "۱. ملحفه‌ها باید کاملاً کشیده و بدون چروک‌های به هم ریخته باشند.\n" +
+                            "۲. پتو باید صاف و متقارن پهن شده یا دقیق تا شده باشد.\n" +
+                            "۳. بالش‌ها در جای مناسب و تراز در بالای تخت قرار گرفته باشند.\n" +
+                            "اگر تخت نامرتب است (پتو مچاله، ملحفه چروک، بالش کج یا لباس روی تخت): isTidy = false، score زیر ۶۰ و ایرادات دقیق را در issues بنویس.\n" +
+                            "اگر تخت کاملاً مرتب است: isTidy = true، score بین ۸۰ تا ۱۰۰ و در feedback تشویق کن."
                         )
                     }
                 )
             }
-            val jsonText = response.text ?: throw IllegalStateException("پاسخ مدل خالی بود.")
+            val rawText = response.text ?: throw IllegalStateException("پاسخ مدل خالی بود.")
+            val jsonText = rawText.trim()
+                .removePrefix("```json")
+                .removePrefix("```")
+                .removeSuffix("```")
+                .trim()
             val json = JSONObject(jsonText)
             val isRelevant = json.optBoolean("isRelevant", true)
-            val isTidy = json.getBoolean("isTidy")
-            val score = json.getInt("score")
-            val feedback = json.getString("feedback")
+            val isTidy = json.optBoolean("isTidy", false)
+            val score = json.optInt("score", if (isTidy) 85 else if (isRelevant) 45 else 0)
+            val feedback = json.optString("feedback", "ارزیابی تخت خواب انجام شد.")
             val issuesArray = json.optJSONArray("issues")
             val issues = mutableListOf<String>()
             if (issuesArray != null) {
@@ -146,82 +193,196 @@ class GeminiAiManager {
                 }
             }
             BedInspectionResult(isTidy, score, feedback, issues, isRelevant, isOfflineEngine = false)
+        } catch (e: TimeoutCancellationException) {
+            Log.w(TAG, "Cloud vision timed out after 35s. Switching to on-device anti-sanction vision engine.")
+            inspectBedImageLocally(scaledBitmap)
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
-            Log.w(TAG, "Cloud inspection failed (network or geo-restriction). Activating on-device anti-sanction vision engine: ${e.message}")
-            inspectBedImageLocally(bitmap)
+            Log.w(TAG, "Cloud inspection failed (${e.javaClass.simpleName}: ${e.message}). Switching to on-device anti-sanction vision engine.")
+            inspectBedImageLocally(scaledBitmap)
         }
     }
 
     /**
-     * Local computer vision analyzer that works 100% offline without internet or VPN.
-     * Evaluates luminosity, color distribution, uniformity, and detects blank/irrelevant shots.
+     * Smart on-device computer vision engine that works 100% offline without internet or VPN.
+     * Evaluates luminosity, color distribution, skin tone presence (selfie rejection),
+     * texture variance, wall/floor rejection, and bed sheet uniformity.
      */
     fun inspectBedImageLocally(bitmap: Bitmap): BedInspectionResult {
         return try {
             val width = bitmap.width
             val height = bitmap.height
 
-            // Sample a 16-point grid
+            // Sample an 8x8 grid (64 sample points across the image)
+            val gridCols = 8
+            val gridRows = 8
+            val stepX = (width / (gridCols + 1)).coerceAtLeast(1)
+            val stepY = (height / (gridRows + 1)).coerceAtLeast(1)
+
             var totalLum = 0.0
-            val samples = mutableListOf<Double>()
+            var skinToneCount = 0
+            var greenOutdoorCount = 0
+            val lumGrid = Array(gridRows) { DoubleArray(gridCols) }
 
-            val stepX = (width / 5).coerceAtLeast(1)
-            val stepY = (height / 5).coerceAtLeast(1)
-
-            for (y in 1..4) {
-                for (x in 1..4) {
-                    val px = (x * stepX).coerceIn(0, width - 1)
-                    val py = (y * stepY).coerceIn(0, height - 1)
+            for (r in 0 until gridRows) {
+                for (c in 0 until gridCols) {
+                    val px = ((c + 1) * stepX).coerceIn(0, width - 1)
+                    val py = ((r + 1) * stepY).coerceIn(0, height - 1)
                     val pixel = bitmap.getPixel(px, py)
-                    val r = Color.red(pixel)
-                    val g = Color.green(pixel)
-                    val b = Color.blue(pixel)
-                    // Luminance formula
-                    val lum = 0.299 * r + 0.587 * g + 0.114 * b
-                    samples.add(lum)
+                    val red = Color.red(pixel)
+                    val green = Color.green(pixel)
+                    val blue = Color.blue(pixel)
+
+                    val lum = 0.299 * red + 0.587 * green + 0.114 * blue
+                    lumGrid[r][c] = lum
                     totalLum += lum
+
+                    // Human skin tone detection (reject selfies, faces, hands)
+                    val isSkin = red > 95 && green > 40 && blue > 20 &&
+                            red > green && red > blue &&
+                            (red - green) in 15..95 &&
+                            (red - blue) > 15
+                    if (isSkin) skinToneCount++
+
+                    // Outdoor vegetation / green grass detection
+                    if (green > 90 && green > red * 1.25 && green > blue * 1.25) {
+                        greenOutdoorCount++
+                    }
                 }
             }
 
-            val avgLum = totalLum / samples.size
+            val totalPoints = gridRows * gridCols
+            val avgLum = totalLum / totalPoints
 
-            // Compute variance to detect blank/monochrome/dark screen
-            var varianceSum = 0.0
-            for (s in samples) {
-                varianceSum += (s - avgLum) * (s - avgLum)
+            // Compute overall luminance variance
+            var lumVarianceSum = 0.0
+            for (r in 0 until gridRows) {
+                for (c in 0 until gridCols) {
+                    val diff = lumGrid[r][c] - avgLum
+                    lumVarianceSum += diff * diff
+                }
             }
-            val variance = varianceSum / samples.size
+            val overallVariance = lumVarianceSum / totalPoints
 
-            // 1. Irrelevant or bad image check:
-            if (avgLum < 22.0 || avgLum > 245.0 || variance < 8.0) {
+            // 1. Extreme lighting / covered lens
+            if (avgLum < 24.0) {
                 return BedInspectionResult(
                     isTidy = false,
                     score = 0,
-                    feedback = "تصویر تاریک، بیش از حد مات یا پوشیده است! لطفاً با روشنایی کافی و زاویه مستقیم از تخت خواب عکس بگیرید.",
-                    issues = listOf("نور ناکافی یا پوشیده بودن لنز"),
+                    feedback = "تصویر بیش از حد تاریک یا پوشانده شده است! لطفاً چراغ اتاق را روشن کرده و از تخت خواب عکس بگیرید.",
+                    issues = listOf("نور ناکافی محیط"),
                     isRelevant = false,
                     isOfflineEngine = true
                 )
             }
 
-            // 2. Uniformity check for tidy duvet and bed sheets:
-            // In a made bed, lower rows (bedsheet & duvet) show balanced gradient, not wild chaotic variance
-            val lowerRowLum = (samples[8] + samples[9] + samples[10] + samples[11]) / 4.0
-            val upperRowLum = (samples[0] + samples[1] + samples[2] + samples[3]) / 4.0
-            val symmetryDiff = abs(samples[1] - samples[2]) // Pillow zone symmetry
-
-            val score = if (symmetryDiff < 45.0) {
-                (88 + Random.nextInt(0, 9)).coerceIn(85, 96)
-            } else {
-                (74 + Random.nextInt(0, 8)).coerceIn(70, 82)
+            if (avgLum > 245.0 && overallVariance < 15.0) {
+                return BedInspectionResult(
+                    isTidy = false,
+                    score = 0,
+                    feedback = "تصویر بیش از حد نورانی یا سفید یکدست است. لطفاً از فضای تخت خواب عکس بگیرید.",
+                    issues = listOf("تصویر سفید یا سوخته در نور"),
+                    isRelevant = false,
+                    isOfflineEngine = true
+                )
             }
 
-            BedInspectionResult(
+            // 2. Reject selfie / human faces / person dominance
+            val skinRatio = skinToneCount.toFloat() / totalPoints
+            if (skinRatio > 0.28f) {
+                return BedInspectionResult(
+                    isTidy = false,
+                    score = 0,
+                    feedback = "تصویر حاوی چهره یا سلفی است! لطفاً دوربین را مستقیماً به سمت تخت خواب خود بگیرید.",
+                    issues = listOf("تصویر حاوی چهره انسان است"),
+                    isRelevant = false,
+                    isOfflineEngine = true
+                )
+            }
+
+            // 3. Reject outdoor / plants / garden
+            val outdoorRatio = greenOutdoorCount.toFloat() / totalPoints
+            if (outdoorRatio > 0.35f) {
+                return BedInspectionResult(
+                    isTidy = false,
+                    score = 0,
+                    feedback = "تصویر نامرتبط است (فضای باز یا گیاهان). لطفاً فقط از تخت خواب و رختخواب خود عکس بگیرید.",
+                    issues = listOf("تصویر در فضای بیرون ثبت شده است"),
+                    isRelevant = false,
+                    isOfflineEngine = true
+                )
+            }
+
+            // 4. Reject flat monochrome wall or empty floor without furniture
+            if (overallVariance < 16.0) {
+                return BedInspectionResult(
+                    isTidy = false,
+                    score = 0,
+                    feedback = "تصویر نامرتبط است (دیوار یا زمین خالی). لطفاً از زاویه‌ای که تخت خواب و بالش‌ها مشخص باشند عکس بگیرید.",
+                    issues = listOf("تصویر فاقد ساختار تخت خواب است"),
+                    isRelevant = false,
+                    isOfflineEngine = true
+                )
+            }
+
+            // 5. Bed bedding texture and tidiness evaluation
+            // Duvet area local roughness (measures wrinkles, chaotic lumps, crumpled blankets)
+            var duvetRoughnessSum = 0.0
+            var duvetSamples = 0
+            for (r in 3 until gridRows) {
+                for (c in 0 until gridCols - 1) {
+                    val horizDelta = abs(lumGrid[r][c] - lumGrid[r][c + 1])
+                    duvetRoughnessSum += horizDelta
+                    duvetSamples++
+                }
+            }
+            val avgRoughness = if (duvetSamples > 0) duvetRoughnessSum / duvetSamples else 0.0
+
+            // Left vs Right symmetry in the duvet section
+            var leftSideLum = 0.0
+            var rightSideLum = 0.0
+            var halfPoints = 0
+            for (r in 3 until gridRows) {
+                for (c in 0 until gridCols / 2) {
+                    leftSideLum += lumGrid[r][c]
+                    rightSideLum += lumGrid[r][gridCols - 1 - c]
+                    halfPoints++
+                }
+            }
+            val sideBalance = abs((leftSideLum / halfPoints) - (rightSideLum / halfPoints))
+
+            val isUntidy = avgRoughness > 32.0 || sideBalance > 45.0
+
+            if (isUntidy) {
+                val score = (38 + Random.nextInt(0, 16)).coerceIn(35, 56)
+                val detectedIssues = mutableListOf<String>()
+                if (avgRoughness > 32.0) {
+                    detectedIssues.add("چروک و ناهمواری در سطح ملحفه یا پتو")
+                }
+                if (sideBalance > 45.0) {
+                    detectedIssues.add("عدم تقارن پتو و نامرتب بودن چیدمان")
+                }
+                if (detectedIssues.isEmpty()) {
+                    detectedIssues.add("پتو به درستی روی تخت صاف نشده است")
+                }
+
+                return BedInspectionResult(
+                    isTidy = false,
+                    score = score,
+                    feedback = "تخت خواب نامرتب است! ملحفه‌ها کاملاً صاف نیستند یا پتو مرتب پهن نشده است. لطفاً آن را مرتب کرده و مجدداً عکس بگیرید.",
+                    issues = detectedIssues,
+                    isRelevant = true,
+                    isOfflineEngine = true
+                )
+            }
+
+            // Bed is tidy and properly arranged
+            val neatScore = (85 + Random.nextInt(0, 11)).coerceIn(84, 96)
+            return BedInspectionResult(
                 isTidy = true,
-                score = score,
-                feedback = "تایید شده توسط موتور هوشمند داخلی (ضدتحریم و آفلاین): ملحفه صاف، پتو مرتب و بالش‌ها در تراز مناسب قرار دارند. اراده شما ستودنی است!",
+                score = neatScore,
+                feedback = "آفرین! ملحفه‌ها صاف، پتو مرتب و بالش‌ها در موقعیت مناسب قرار دارند. اراده و انضباط امروز شما ثبت شد.",
                 issues = emptyList(),
                 isRelevant = true,
                 isOfflineEngine = true
@@ -229,11 +390,11 @@ class GeminiAiManager {
         } catch (e: Exception) {
             Log.e(TAG, "Local vision fallback error", e)
             BedInspectionResult(
-                isTidy = true,
-                score = 85,
-                feedback = "تایید با موتور پردازش سریع: انضباط اتاق و تخت خواب شما ثبت شد.",
-                issues = emptyList(),
-                isRelevant = true,
+                isTidy = false,
+                score = 0,
+                feedback = "خطا در ارزیابی تصویر. لطفاً مجدداً با نور کافی از تخت خواب عکس بگیرید.",
+                issues = listOf("خطا در پردازش تصویر"),
+                isRelevant = false,
                 isOfflineEngine = true
             )
         }

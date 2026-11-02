@@ -112,25 +112,42 @@ fun BedInspectionScreen(
     val scope = rememberCoroutineScope()
 
     fun evaluateImage(bitmap: Bitmap) {
-        capturedBitmap = bitmap
+        // Safe downscale to prevent huge camera bitmaps from causing UI frame drops or OOM
+        val safeBitmap = if (bitmap.width > 1200 || bitmap.height > 1200) {
+            val ratio = bitmap.width.toFloat() / bitmap.height.toFloat()
+            val targetW = if (bitmap.width > bitmap.height) 1200 else (1200 * ratio).toInt()
+            val targetH = if (bitmap.height >= bitmap.width) 1200 else (1200 / ratio).toInt()
+            Bitmap.createScaledBitmap(bitmap, targetW.coerceAtLeast(1), targetH.coerceAtLeast(1), true)
+        } else {
+            bitmap
+        }
+
+        capturedBitmap = safeBitmap
         isAnalyzing = true
         inspectionResult = null
         scope.launch {
-            val result = aiManager.inspectBedImage(bitmap)
-            inspectionResult = result
-            isAnalyzing = false
-            if (result.isRelevant && result.isTidy) {
-                try {
-                    repository.logVerification(
-                        routineId = task.id,
-                        type = "bed",
-                        isApproved = true,
-                        aiFeedback = result.feedback,
-                        score = result.score.toLong()
-                    )
-                } catch (e: Exception) {
-                    Log.e("BedInspection", "Error logging verification", e)
+            try {
+                val result = aiManager.inspectBedImage(safeBitmap)
+                inspectionResult = result
+                if (result.isRelevant && result.isTidy) {
+                    try {
+                        repository.logVerification(
+                            routineId = task.id,
+                            type = "bed",
+                            isApproved = true,
+                            aiFeedback = result.feedback,
+                            score = result.score.toLong()
+                        )
+                    } catch (e: Exception) {
+                        Log.e("BedInspection", "Error logging verification", e)
+                    }
                 }
+            } catch (e: Exception) {
+                Log.e("BedInspection", "Error in evaluateImage, falling back to local vision engine", e)
+                val fallbackResult = aiManager.inspectBedImageLocally(safeBitmap)
+                inspectionResult = fallbackResult
+            } finally {
+                isAnalyzing = false
             }
         }
     }
@@ -429,22 +446,64 @@ fun BedInspectionScreen(
 
             Spacer(modifier = Modifier.height(8.dp))
 
-            // Simulator for Quick Test / Offline
-            OutlinedButton(
-                onClick = {
-                    val simBitmap = createSimulatedBedBitmap(isTidy = true)
-                    evaluateImage(simBitmap)
-                },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(44.dp)
-                    .testTag("simulate_tidy_bed_button"),
-                shape = RoundedCornerShape(10.dp),
-                enabled = !isAnalyzing
+            Spacer(modifier = Modifier.height(8.dp))
+
+            // Simulators for Quick Testing of all states (Tidy, Untidy, Non-bed)
+            Text(
+                text = "حالت‌های آزمایشی سریع هوش مصنوعی:",
+                style = MaterialTheme.typography.labelSmall,
+                color = TextMuted,
+                modifier = Modifier.padding(bottom = 6.dp)
+            )
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                Icon(Icons.Default.Refresh, contentDescription = null, tint = TextMuted, modifier = Modifier.size(16.dp))
-                Spacer(modifier = Modifier.width(6.dp))
-                Text("تست با تصویر شبیه‌سازی تخت کاملاً مرتب", color = TextMuted, fontSize = 12.sp)
+                OutlinedButton(
+                    onClick = {
+                        val simBitmap = createSimulatedBedBitmap(isTidy = true)
+                        evaluateImage(simBitmap)
+                    },
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(38.dp)
+                        .testTag("simulate_tidy_bed_button"),
+                    shape = RoundedCornerShape(8.dp),
+                    enabled = !isAnalyzing
+                ) {
+                    Text("تخت مرتب", color = NeonEmerald, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                }
+
+                OutlinedButton(
+                    onClick = {
+                        val simBitmap = createSimulatedBedBitmap(isTidy = false)
+                        evaluateImage(simBitmap)
+                    },
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(38.dp)
+                        .testTag("simulate_untidy_bed_button"),
+                    shape = RoundedCornerShape(8.dp),
+                    enabled = !isAnalyzing
+                ) {
+                    Text("تخت نامرتب", color = NeonAmber, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                }
+
+                OutlinedButton(
+                    onClick = {
+                        val simBitmap = createSimulatedNonBedBitmap()
+                        evaluateImage(simBitmap)
+                    },
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(38.dp)
+                        .testTag("simulate_non_bed_button"),
+                    shape = RoundedCornerShape(8.dp),
+                    enabled = !isAnalyzing
+                ) {
+                    Text("عکس نامرتبط", color = MaterialTheme.colorScheme.error, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                }
             }
 
             Spacer(modifier = Modifier.height(18.dp))
@@ -686,7 +745,7 @@ fun BedInspectionScreen(
 }
 
 /**
- * Creates a simulated bitmap of a neatly made bed for zero-latency testing
+ * Creates a simulated bitmap of a bed (tidy or messy) for testing
  */
 private fun createSimulatedBedBitmap(isTidy: Boolean): Bitmap {
     val width = 480
@@ -696,33 +755,68 @@ private fun createSimulatedBedBitmap(isTidy: Boolean): Bitmap {
     val paint = Paint(Paint.ANTI_ALIAS_FLAG)
 
     // Bedroom Floor background
-    paint.color = AndroidColor.rgb(38, 45, 60)
+    paint.color = AndroidColor.rgb(42, 48, 62)
     canvas.drawRect(0f, 0f, width.toFloat(), height.toFloat(), paint)
 
     // Bed Frame
-    paint.color = AndroidColor.rgb(75, 45, 25)
+    paint.color = AndroidColor.rgb(85, 55, 35)
     canvas.drawRoundRect(40f, 40f, 440f, 330f, 16f, 16f, paint)
 
     // Mattress & Bed Sheets
-    paint.color = if (isTidy) AndroidColor.rgb(240, 243, 248) else AndroidColor.rgb(180, 190, 205)
+    paint.color = if (isTidy) AndroidColor.rgb(240, 244, 250) else AndroidColor.rgb(175, 185, 200)
     canvas.drawRoundRect(55f, 60f, 425f, 315f, 12f, 12f, paint)
 
-    // Folded Blanket / Duvet
-    paint.color = AndroidColor.rgb(28, 120, 190)
-    canvas.drawRoundRect(55f, 130f, 425f, 315f, 8f, 8f, paint)
-
-    // Pillows (Two neat pillows on top)
-    paint.color = AndroidColor.WHITE
+    // Duvet / Blanket
     if (isTidy) {
+        // Neatly stretched, symmetrical duvet
+        paint.color = AndroidColor.rgb(28, 120, 190)
+        canvas.drawRoundRect(55f, 130f, 425f, 315f, 8f, 8f, paint)
+
+        // Pillows (Two crisp aligned pillows)
+        paint.color = AndroidColor.WHITE
         canvas.drawRoundRect(70f, 70f, 220f, 120f, 10f, 10f, paint)
         canvas.drawRoundRect(260f, 70f, 410f, 120f, 10f, 10f, paint)
     } else {
+        // Disorganized, crumpled duvet with dark folds and high texture roughness
+        paint.color = AndroidColor.rgb(35, 100, 160)
+        canvas.drawRoundRect(60f, 150f, 420f, 310f, 8f, 8f, paint)
+
+        // Wrinkle folds & messy shapes
+        paint.color = AndroidColor.rgb(15, 60, 110)
+        canvas.drawRoundRect(80f, 160f, 240f, 240f, 15f, 15f, paint)
+        paint.color = AndroidColor.rgb(200, 80, 80) // Discarded piece of clothing
+        canvas.drawRoundRect(260f, 190f, 370f, 270f, 12f, 12f, paint)
+
+        // Crooked and fallen pillows
+        paint.color = AndroidColor.WHITE
         canvas.save()
-        canvas.rotate(18f, 150f, 95f)
-        canvas.drawRoundRect(70f, 70f, 220f, 120f, 10f, 10f, paint)
+        canvas.rotate(24f, 140f, 95f)
+        canvas.drawRoundRect(60f, 70f, 210f, 120f, 10f, 10f, paint)
         canvas.restore()
-        canvas.drawRoundRect(250f, 85f, 400f, 135f, 10f, 10f, paint)
+
+        paint.color = AndroidColor.rgb(220, 225, 235)
+        canvas.save()
+        canvas.rotate(-15f, 320f, 110f)
+        canvas.drawRoundRect(240f, 95f, 390f, 145f, 10f, 10f, paint)
+        canvas.restore()
     }
+
+    return bitmap
+}
+
+/**
+ * Creates a simulated non-bed image (blank monochrome wall / floor) to verify rejection
+ */
+private fun createSimulatedNonBedBitmap(): Bitmap {
+    val width = 480
+    val height = 360
+    val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
+    val canvas = Canvas(bitmap)
+    val paint = Paint(Paint.ANTI_ALIAS_FLAG)
+
+    // Flat monochrome wall (almost zero variance across the image)
+    paint.color = AndroidColor.rgb(218, 222, 228)
+    canvas.drawRect(0f, 0f, width.toFloat(), height.toFloat(), paint)
 
     return bitmap
 }
